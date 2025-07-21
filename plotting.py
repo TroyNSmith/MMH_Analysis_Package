@@ -9,7 +9,6 @@ try:
 except FileNotFoundError:
     pass
 
-
 def plot_line(output: str,
               x: NDArray,
               *y: NDArray,
@@ -74,6 +73,7 @@ def plot_line(output: str,
     # Display the plot
     plt.tight_layout()
     plt.savefig(output)
+    plt.close()
 
 def plot_scatter(output: str,
                  x: NDArray,
@@ -138,3 +138,4 @@ def plot_scatter(output: str,
     # Display the plot
     plt.tight_layout()
     plt.savefig(output, dpi=600)
+    plt.close()

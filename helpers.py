@@ -1,5 +1,6 @@
 # Imports #
 # ------- #
+from collections import defaultdict
 import logging
 import mdevaluate as mde
 import numpy as np
@@ -144,3 +145,28 @@ def multi_radial_selector(atoms,
         )
         indices.append(index)
     return indices
+
+def process_frame(dt, selected_atoms, bin_edges):
+    '''
+    Processes a single frame and returns the histogram updates for each atom.
+
+    Args:
+        dt: The current frame from the trajectory.
+        selected_atoms: The list of selected atoms.
+        bin_edges: The bin edges for histogram calculation.
+
+    Returns:
+        histograms: A dictionary of histogram updates for each (resname, atom.name) combo.
+    '''
+    # Compute the magnitude of each atom in the x,y-plane (ignore z)
+    magnitudes = np.sqrt(selected_atoms.positions[:, 0]**2 + selected_atoms.positions[:, 1]**2)
+
+    # Dictionary to store histogram updates for each resname + atom name combo
+    local_histograms = defaultdict(lambda: np.zeros(len(bin_edges)-1))  # Local histogram for this frame
+
+    # Update histograms for each atom's resname + atom.name combo
+    for i, atom in enumerate(selected_atoms):
+        key = (atom.resname, atom.name)
+        local_histograms[key] += np.histogram([magnitudes[i]], bins=bin_edges)[0]
+    
+    return local_histograms

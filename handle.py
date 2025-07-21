@@ -1,12 +1,14 @@
-# ===== Imports =====
+# Imports #
+# ------- #
 import MDAnalysis as mda
 import mdevaluate as mde
 from numpy.typing import NDArray
+from typing import Any
+# ------- #
 
-# ===== Functions =====
 def handle_args(args)-> dict:
     """
-    This will create a dictionary of all provided keyword arguments.
+    This will create a dictionary of all provided keyword arguments for easier passing.
     """
     args_dict = {}
     for arg in vars(args):
@@ -15,7 +17,7 @@ def handle_args(args)-> dict:
             
     return args_dict
 
-def handle_interactive(MDA_universe, residue)-> dict:
+def handle_interactive(MDA_universe: Any, residue: str)-> dict:
     """
     Handle interactive mode, prompting the user for various inputs.
     """
@@ -68,7 +70,11 @@ def handle_interactive(MDA_universe, residue)-> dict:
         except ValueError:
             print('Invalid input. Please try again.')
 
-def handle_vectors(mde_trajectory, residue:str, atom1:str, atom2:str)-> NDArray:
+def handle_vectors(mde_trajectory,
+                   residue:str,
+                   atom1:str,
+                   atom2:str,
+                   )-> NDArray:
     """
     Process and save mdevaluate indices/vectors.
 
@@ -81,9 +87,11 @@ def handle_vectors(mde_trajectory, residue:str, atom1:str, atom2:str)-> NDArray:
     Returns:
         NDArray: NumPy array containing the center of mass coordinates for selected residues.
     """
-    mde_indices_1 = mde_trajectory.subset(atom_name=atom1, residue_name=residue).atom_subset.indices[0]
-    mde_indices_2 = mde_trajectory.subset(atom_name=atom2, residue_name=residue).atom_subset.indices[0]
-    mde_vectors = mde.coordinates.vectors(mde_trajectory, atom_indices_a=mde_indices_1,
-                                          atom_indices_b=mde_indices_2, normed=True)
+    mde_indices_1 = mde_trajectory.subset(atom_name=atom1, residue_name=residue).atom_subset.indices
+    mde_indices_2 = mde_trajectory.subset(atom_name=atom2, residue_name=residue).atom_subset.indices
+    mde_vectors = mde.coordinates.vectors(mde_trajectory,
+                                          atom_indices_a=mde_indices_1,
+                                          atom_indices_b=mde_indices_2,
+                                          normed=True)
 
     return mde_vectors
