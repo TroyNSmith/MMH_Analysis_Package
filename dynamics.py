@@ -1,18 +1,15 @@
-# Imports #
-# ------- #
+# ===== Imports =====
 from functools import partial
 import helpers
 import mdevaluate as mde
 import numpy as np
 from numpy.typing import NDArray
 from scipy.optimize import curve_fit
-# ------- #
 
-def average_msd(com: NDArray,
-                segments:int = 1000
-                )-> NDArray:
+# ===== Functions =====
+def average_msd(com: NDArray, segments:int = 1000)-> NDArray:
     """
-    Calculated mean square displacement (MSD) based on centers of masses.
+    Calculates average mean square displacement (MSD) based on centers of masses.
 
     Args:
         com: NumPy array containing the center of mass coordinates.
@@ -26,10 +23,7 @@ def average_msd(com: NDArray,
 
     return np.column_stack([time, msd_com, msd_com_z])
 
-def resolved_msd(com: NDArray,
-                 diameter: float,
-                 segments: int=100,
-                 )-> tuple[NDArray, NDArray]:
+def resolved_msd(com: NDArray, diameter: float, segments: int=100)-> tuple[NDArray, NDArray]:
     """
     Calculates radially resolved mean square displacement (MSD) based on centers of masses.
 
@@ -46,24 +40,16 @@ def resolved_msd(com: NDArray,
     r = (bins[:-1] + bins[1:]) / 2
 
     output, results = mde.correlation.shifted_correlation(
-        partial(mde.correlation.msd, axis="z"),
-        com,
+        partial(mde.correlation.msd, axis="z"), com,
         selector=partial(helpers.multi_radial_selector, bins=bins),
-        segments=segments,
-        skip=0.1,
-        average=True,
-    )
+        segments=segments, skip=0.1, average=True)
 
     for result in results:
         output = np.column_stack([output, result])
 
     return output, r
 
-def isf(com: NDArray,
-        q_val: float,
-        segments: int,
-        radius: float,
-        )-> NDArray:
+def isf(com: NDArray, q_val: float, segments: int, radius: float)-> NDArray:
     """
     Calculates intermediate / incoherent scattering functions (ISF) based on centers of masses.
 
@@ -82,9 +68,7 @@ def isf(com: NDArray,
 
     return np.column_stack([times, result_all, result_wall, result_center])
 
-def non_Gauss(com: NDArray, 
-              segments: int,
-              )-> NDArray:
+def non_Gauss(com: NDArray, segments: int)-> NDArray:
     """
     Calculates non-Gaussian displacements based on centers of masses.
 
@@ -99,11 +83,7 @@ def non_Gauss(com: NDArray,
 
     return np.column_stack([times, results])
 
-def resolved_isf(com:NDArray, 
-                 q_val:float, 
-                 diameter:float, 
-                 segments:int = 100
-                 )-> tuple[NDArray, NDArray]: 
+def resolved_isf(com:NDArray, q_val:float, diameter:float, segments:int = 100)-> tuple[NDArray, NDArray]: 
     """
     Calculates radially resolved  intermediate / incoherent scattering functions (ISF) based on centers of masses.
 
@@ -132,9 +112,7 @@ def resolved_isf(com:NDArray,
 
     return output, r
 
-def rotational_corr(vectors: NDArray, 
-                    segments: int = 100
-                    )-> NDArray:
+def rotational_corr(vectors: NDArray, segments: int = 100)-> NDArray:
     """
     Calculates the first and second order rotational correlations for atom-to-atom vectors.
 
@@ -157,9 +135,7 @@ def rotational_corr(vectors: NDArray,
 
     return np.column_stack([time, results_f1, fit_f1, results_f2, fit_f2])
 
-def susceptibility(com: NDArray,
-                   q_val: float
-                   )-> NDArray:
+def susceptibility(com: NDArray, q_val: float)-> NDArray:
     """
     Calculates fourth-order susceptibility of the residues based on provided centers of masses.
 
@@ -177,9 +153,7 @@ def susceptibility(com: NDArray,
 
     return np.column_stack([time[2:-2], chi4_results[2:-2], chi4_smooth])
 
-def vanHove_rotation(vectors: NDArray, 
-                     segments: int
-                     )-> NDArray:
+def vanHove_rotation(vectors: NDArray, segments: int)-> NDArray:
     """
     Calculates van Hove rotational dynamics based on centers of masses.
 
@@ -211,10 +185,7 @@ def vanHove_rotation(vectors: NDArray,
     return van_hove_angle(segments,vectors)
 
 
-def vanHove_translation(com:NDArray, 
-                        diameter: float, 
-                        segments: int
-                        )-> tuple[NDArray, NDArray, NDArray]:
+def vanHove_translation(com:NDArray, diameter: float, segments: int)-> tuple[NDArray, NDArray, NDArray]:
     """
     Calculates van Hove translational dynamics based on centers of masses.
 
