@@ -1,0 +1,36 @@
+# General settings
+figure.figsize         : 6, 4           # Width, Height (in inches)
+figure.dpi             : 600            # Resolution of the figure
+figure.facecolor       : white          # Background color of the figure
+axes.facecolor         : white          # Background color of the axes
+axes.edgecolor         : black          # Color of the axes' border
+axes.linewidth         : 1.2            # Width of the axes' border
+axes.grid              : False          # Show grid
+axes.prop_cycle        : cycler('color', ['CC6677', '332288', 'DDCC77', '117733', '88CCEE', '882255', '44AA99', '999933', 'AA4499', '77AADD', 'EE8866', 'EEDD88', 'FFAABB', '99DDFF', '44BB99', 'BBCC33', 'AAAA00', 'DDDDDD'])
+savefig.bbox           : tight          # Crops the figure to fit its contents
+
+# Ticks
+xtick.direction        : out            # Ticks direction: 'in', 'out', 'inout'
+ytick.direction        : out            # Ticks direction for y-axis
+xtick.major.size       : 8              # Major x-axis tick size
+ytick.major.size       : 8              # Major y-axis tick size
+xtick.minor.size       : 4              # Minor x-axis tick size
+ytick.minor.size       : 4              # Minor y-axis tick size
+xtick.major.width      : 1.5            # Major tick width
+ytick.major.width      : 1.5            # Major tick width
+xtick.minor.width      : 1.0            # Minor tick width
+ytick.minor.width      : 1.0            # Minor tick width
+
+# Axis Labels
+axes.labelsize         : 12             # Font size for axis labels
+axes.labelweight       : bold           # Weight for axis labels
+axes.labelpad          : 5.0            # Padding between axis label and axis
+
+# Title
+axes.titlesize         : 14             # Font size for the plot title
+axes.titleweight       : bold           # Weight for title
+axes.titlepad          : 20             # Padding between title and plot
+
+# Legend
+legend.loc             : upper left     # Location of the legend on the grid
+legend.edgecolor       : black          # Edge color of legend
