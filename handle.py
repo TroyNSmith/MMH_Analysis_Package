@@ -1,12 +1,10 @@
-# Imports #
-# ------- #
+# ===== Imports =====
 import MDAnalysis as mda
 import mdevaluate as mde
 from numpy.typing import NDArray
-# ------- #
 
-def handle_args(args
-                )-> dict:
+# ===== Functions =====
+def handle_args(args)-> dict:
     """
     This will create a dictionary of all provided keyword arguments.
     """
@@ -17,9 +15,7 @@ def handle_args(args
             
     return args_dict
 
-def handle_interactive(MDA_universe,
-                       residue,
-                       )-> dict:
+def handle_interactive(MDA_universe, residue)-> dict:
     """
     Handle interactive mode, prompting the user for various inputs.
     """
@@ -72,11 +68,7 @@ def handle_interactive(MDA_universe,
         except ValueError:
             print('Invalid input. Please try again.')
 
-def handle_vectors(mde_trajectory,
-                   residue:str,
-                   atom1:str,
-                   atom2:str,
-                   )-> NDArray:
+def handle_vectors(mde_trajectory, residue:str, atom1:str, atom2:str)-> NDArray:
     """
     Process and save mdevaluate indices/vectors.
 
