@@ -83,9 +83,7 @@ def handle_vectors(mde_trajectory, residue:str, atom1:str, atom2:str)-> NDArray:
     """
     mde_indices_1 = mde_trajectory.subset(atom_name=atom1, residue_name=residue).atom_subset.indices[0]
     mde_indices_2 = mde_trajectory.subset(atom_name=atom2, residue_name=residue).atom_subset.indices[0]
-    mde_vectors = mde.coordinates.vectors(mde_trajectory,
-                                          atom_indices_a=mde_indices_1,
-                                          atom_indices_b=mde_indices_2,
-                                          normed=True)
+    mde_vectors = mde.coordinates.vectors(mde_trajectory, atom_indices_a=mde_indices_1,
+                                          atom_indices_b=mde_indices_2, normed=True)
 
     return mde_vectors
