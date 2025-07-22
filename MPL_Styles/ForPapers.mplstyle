@@ -22,7 +22,7 @@ xtick.minor.width      : 1.0            # Minor tick width
 ytick.minor.width      : 1.0            # Minor tick width
 
 # Axis Labels
-axes.labelsize         : 12             # Font size for axis labels
+axes.labelsize         : 16             # Font size for axis labels
 axes.labelweight       : bold           # Weight for axis labels
 axes.labelpad          : 5.0            # Padding between axis label and axis
 
