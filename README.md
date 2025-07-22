@@ -5,12 +5,12 @@ This project uses Pixi for environment and dependency management. Pixi is a fast
 
 ### 1. Install Pixi
 Run the following in your terminal:
-`curl -sSf https://prefix.dev/install.sh | bash`
+```curl -sSf https://prefix.dev/install.sh | bash```
 
 Then restart your terminal (or follow the post-install instructions to update your `PATH`).
 
 Verify installation:
-`pixi --version`
+```pixi --version```
 
 ### 2. Clone This Repository
 ```
