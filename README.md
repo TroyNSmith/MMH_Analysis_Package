@@ -12,7 +12,7 @@ curl -sSf https://prefix.dev/install.sh | bash
 Then restart your terminal (or follow the post-install instructions to update your `PATH`).
 
 Verify installation:
-``
+```
 pixi --version
 ```
 
