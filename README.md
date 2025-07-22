@@ -1,5 +1,14 @@
 # MMH_Analysis_Package
-For analysis of MD simulations performed by the MMH group
+
+## Getting Started with Pixi
+This project uses Pixi for environment and dependency management. Pixi is a fast, reproducible tool similar to conda, but with better performance and built-in support for scripting and multi-platform environments.
+
+### 1. Install Pixi
+Run the following in your terminal:
+
+'''curl -sSf https://prefix.dev/install.sh | bash'''
+
+Then restart your terminal (or follow the post-install instructions to update your PATH).
 
 To do:
 
