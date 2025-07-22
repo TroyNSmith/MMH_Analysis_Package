@@ -1,20 +1,33 @@
 # MMH_Analysis_Package
 
 ## Getting Started with Pixi
-This project uses Pixi for environment and dependency management. Pixi is a fast, reproducible tool similar to conda, but with better performance and built-in support for scripting and multi-platform environments.
+This project uses [Pixi](https://pixi.sh/latest/) for environment and dependency management. Pixi is a fast, reproducible tool similar to conda, but with better performance, built-in support for scripting and multi-platform environments, and full compatibility with [VS Code](https://code.visualstudio.com/). 
 
-### 1. Install Pixi
-Run the following in your terminal:
+### 1. Prerequisites
+#### Git
+| Platform | Install Command or Link                                 |
+| -------- | ------------------------------------------------------- |
+| Windows  | Run through WSL & follow Linux                          |
+| MacOS    | Pre-installed or run `brew install git` (with Homebrew) |
+| Linux    | Run `sudo apt install git` (Debian/Ubuntu)              |
+
+Verify installation:
 ```
-curl -sSf https://prefix.dev/install.sh | bash
+git --version
 ```
 
-Then restart your terminal (or follow the post-install instructions to update your `PATH`).
+#### Pixi
+| Platform | Install Command or Link                                 |
+| -------- | ------------------------------------------------------- |
+| Windows  | Run through WSL & follow Linux                          |
+| Linux    | Run `curl -sSf https://prefix.dev/install.sh`           |
 
 Verify installation:
 ```
 pixi --version
 ```
+
+Then restart your terminal (or follow the post-install instructions to update your `PATH`).
 
 ### 2. Clone This Repository
 ```
@@ -23,11 +36,11 @@ cd MMH_Analysis_Package
 ```
 
 ### 3. Set Up the Environment
-Inside the project folder, activate the environment:
+Inside the project folder, **activate** the environment:
 ```
 pixi shell
 ```
-All dependencies and tools will be available automatically in this shell.
+All dependencies and tools will be available automatically in this shell.Can yoCan y
 
 ### 4. Run Jupyter Notebook for Interactive Docs
 Once inside the Pixi environment, run:
