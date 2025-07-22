@@ -9,6 +9,7 @@ axes.grid              : False          # Show grid
 axes.prop_cycle        : cycler('color', ['CC6677', '332288', 'DDCC77', '117733', '88CCEE', '882255', '44AA99', '999933', 'AA4499', '77AADD', 'EE8866', 'EEDD88', 'FFAABB', '99DDFF', '44BB99', 'BBCC33', 'AAAA00', 'DDDDDD'])
 savefig.bbox           : tight          # Crops the figure to fit its contents
 
+# ADD FONT SIZE FOR AXIS NUMBERS
 # Ticks
 xtick.direction        : out            # Ticks direction: 'in', 'out', 'inout'
 ytick.direction        : out            # Ticks direction for y-axis
