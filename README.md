@@ -4,6 +4,7 @@
 This project uses [Pixi](https://pixi.sh/latest/) for environment and dependency management. Pixi is a fast, reproducible tool similar to conda, but with better performance, built-in support for scripting and multi-platform environments, and full compatibility with [VS Code](https://code.visualstudio.com/). 
 
 ### 1. Prerequisites
+Make sure the following tools are installed:
 #### Git
 | Platform | Install Command or Link                                 |
 | -------- | ------------------------------------------------------- |
