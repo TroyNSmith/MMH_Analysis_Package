@@ -7,7 +7,7 @@ This project uses [Pixi](https://pixi.sh/latest/) for environment and dependency
 #### Git
 | Platform | Install Command or Link                                 |
 | -------- | ------------------------------------------------------- |
-| Windows  | Run through WSL & follow Linux                          |
+| Windows  | Run through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) & follow Linux |
 | MacOS    | Pre-installed or run `brew install git` (with Homebrew) |
 | Linux    | Run `sudo apt install git` (Debian/Ubuntu)              |
 
@@ -19,7 +19,7 @@ git --version
 #### Pixi
 | Platform | Install Command or Link                                 |
 | -------- | ------------------------------------------------------- |
-| Windows  | Run through WSL & follow Linux                          |
+| Windows  | Run through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) & follow Linux |
 | Linux    | Run `curl -sSf https://prefix.dev/install.sh`           |
 
 Verify installation:
