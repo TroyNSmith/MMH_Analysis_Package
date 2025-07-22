@@ -1,4 +1,4 @@
-# MMH_Analysis_Package
+# MMH Analysis Package
 
 ## Getting Started with Pixi
 This project uses [Pixi](https://pixi.sh/latest/) for environment and dependency management. Pixi is a fast, reproducible tool similar to conda, but with better performance, built-in support for scripting and multi-platform environments, and full compatibility with [VS Code](https://code.visualstudio.com/). 
@@ -72,9 +72,9 @@ git commit -m "Your message."
 git push origin main
 ```
 
-To do:
+## To do:
 
-1. Change tick number sizes
-2. Re-run susceptibility & ISFs
-3. Implement changes to non-Gaussian
-4. Add a correlation function for radial bins
+- [] Change tick number sizes
+- [] Re-run susceptibility & ISFs
+- [] Implement changes to non-Gaussian
+- [] Add a correlation function for radial bins
