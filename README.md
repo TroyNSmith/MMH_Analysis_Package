@@ -74,7 +74,7 @@ git push origin main
 
 ## To do:
 
-- [] Change tick number sizes
-- [] Re-run susceptibility & ISFs
-- [] Implement changes to non-Gaussian
-- [] Add a correlation function for radial bins
+- [ ] Change tick number sizes
+- [ ] Re-run susceptibility & ISFs
+- [ ] Implement changes to non-Gaussian
+- [ ] Add a correlation function for radial bins
