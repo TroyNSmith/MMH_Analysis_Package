@@ -7,7 +7,16 @@ This project uses Pixi for environment and dependency management. Pixi is a fast
 Run the following in your terminal:
 `curl -sSf https://prefix.dev/install.sh | bash`
 
-Then restart your terminal (or follow the post-install instructions to update your PATH).
+Then restart your terminal (or follow the post-install instructions to update your `PATH`).
+
+Verify installation:
+`pixi --version`
+
+### 2. Clone This Repository
+``
+git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
+cd MMH_Analysis_Package
+```
 
 To do:
 
