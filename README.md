@@ -40,12 +40,36 @@ Inside the project folder, **activate** the environment:
 ```
 pixi shell
 ```
-All dependencies and tools will be available automatically in this shell.Can yoCan y
+All dependencies and tools will be available automatically in this shell.
 
 ### 4. Run Jupyter Notebook for Interactive Docs
 Once inside the Pixi environment, run:
 ```
 jupyter lab
+```
+
+### 5. Open in VS Code
+From the terminal:
+```
+code .
+```
+
+In VS Code:
+- Install the **Python** extension.
+- Use `ctrl+\` to open the terminal and run `pixi shell`.
+- Set the Python interpreter: `Ctrl+Shift+P` &#8594; `Python: Select Interpreter` &#8594; `Pixi env`.
+
+### 6. Push and Pull Changes
+#### Pull:
+```
+git pull origin main
+```
+
+#### Commit and Push:
+```
+git add .
+git commit -m "Your message."
+git push origin main
 ```
 
 To do:
