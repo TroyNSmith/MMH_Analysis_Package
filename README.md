@@ -13,7 +13,7 @@ Verify installation:
 `pixi --version`
 
 ### 2. Clone This Repository
-``
+```
 git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
 cd MMH_Analysis_Package
 ```
