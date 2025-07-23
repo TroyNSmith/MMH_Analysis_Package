@@ -41,14 +41,14 @@ git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
 cd MMH_Analysis_Package
 ```
 
-### 3. Set Up the Environment
+### 3. Set Up the Environment (Optional)
 Inside the project folder, **activate** the environment:
 ```
 pixi shell
 ```
 All dependencies and tools will be available automatically in this shell.
 
-### 4. Run Jupyter Notebook for Interactive Docs
+### 4. Run Jupyter Notebook for Interactive Docs (Optional)
 Once inside the Pixi environment, run:
 ```
 jupyter lab
