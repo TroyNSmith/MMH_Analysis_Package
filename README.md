@@ -152,6 +152,8 @@ git push origin main
 
 - [ ] Reduce number of dependencies and encapsulate environment in Pixi .toml file
 
+- [ ] Functionality to bypass primary analytical scripts and call for a single function instead with data back-up
+
 - [ ] Create Jupyter notebooks for testing & instructing
     - [ ] General documentation
     - [ ] Modules introducing students to Python and MD simulations
