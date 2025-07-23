@@ -70,6 +70,20 @@ cat ~/.ssh/id_ed25519.pub
 
 For more information on SSH keys, visit [GitHub Docs](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 
+#### Clone the Git
+Inside of your terminal, navigate to (or create a) directory for the package to be hosted locally:
+##### &#9398; Navigate to a Directory
+```
+cd /path/to/your/directory
+```
+
+##### &#9399; Create a Directory
+```
+cd /path/to/a/directory
+mkdir Example
+cd Example
+```
+
 ```
 git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
 cd MMH_Analysis_Package
