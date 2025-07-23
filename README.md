@@ -80,9 +80,37 @@ git commit -m "Your message."
 git push origin main
 ```
 
-## To do:
+## To do for current paper:
 
-- [ ] Change tick number sizes
-- [ ] Re-run susceptibility & ISFs
-- [ ] Implement changes to non-Gaussian
-- [ ] Add a correlation function for radial bins
+- [ ] Update image formats for data graphs
+- [ ] Regenerate ISF and susceptibility data with a global q value
+- [ ] Update non-Gaussian analysis
+- [ ] Develop a correlation function for radial bins
+
+## Future plans:
+
+- [ ] Create a custom coordinates object from mdtraj Trajectory
+    - [ ] Implement @property decorations for data organization and access
+    - [ ] Implement functionality for selection filtering
+    - [ ] Implement functionality for converting atomic coordinates into residue center of mass coordinates
+    - [ ] Implement functionality for unwrapping coordinates from periodic boundary conditions
+
+- [ ] Port mdevaluate functionalities to eliminate dependency
+    - [ ] Rework and port correlation functions from mdevaluate
+    - [ ] Provide in-depth documentation
+    - [ ] Optimize for parallelization
+
+- [ ] Reduce number of dependencies and encapsulate environment in Pixi .toml file
+
+- [ ] Create Jupyter notebooks for testing & instructing
+    - [ ] General documentation
+    - [ ] Modules introducing students to Python and MD simulations
+    - [ ] Performing analysis without having to run full scripts
+    - [ ] Testing plot styles before implementing them
+
+- [ ] Consolidate previous codes into the package, including bash scripts for simulating and analyzing data
+
+- [ ] Functionality additions
+    - [ ] Testing OpenMM for potential use with recent polarizable force fields including AMOEBA
+    - [ ] Exploring new methods for greater depth of analysis in future projects
+    - [ ] Implementing quantum mechanical calculations for structural analysis
