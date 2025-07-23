@@ -280,8 +280,8 @@ def radial_distances(mda_universe: Any, workdir: str, pore_diameter: float, excl
         plt.savefig(f'{workdir}/analysis/graphs/HBonds/Positions_heatmap_{atom}.png')
         plt.close()
 
-def rdf_com(com: NDArray, segments: int = 1000)-> tuple[NDArray, float, float]: 
-    '''
+def rdf_com(com: NDArray, segments: int = 1000) -> tuple[NDArray, float, float]:
+    """
     Computes a radial distribution function (RDF) for the centers of masses.
 
     Args:
@@ -292,15 +292,19 @@ def rdf_com(com: NDArray, segments: int = 1000)-> tuple[NDArray, float, float]:
         NDArray: Resulting RDF.
         float: Value for q constant.
         float: Value for g max.
-    '''
+    """
     bins = np.arange(0, 2.2, 0.01)
-    result_rdf = mde.distribution.time_average(partial(mde.distribution.rdf, bins=bins), com, segments=segments, skip=0.01)
+    rdf = mde.distribution.time_average(
+        partial(mde.distribution.rdf, bins=bins), com, segments=segments, skip=0.01
+    )
+    out = np.column_stack([bins[:-1], rdf])
 
-    max_y_index = np.argmax(result_rdf[:,1])
+    YMaxIdx = np.argmax(out[:, 1])
+    XAtMax = out[YMaxIdx, 0]
+    YAtMax = out[YMaxIdx, 1]
+    MagScattVector = 2 * np.pi / XAtMax
 
-    max_x_from_y = result_rdf[max_y_index,0]
-
-    return np.column_stack([bins[:-1], result_rdf]), 2*np.pi*(1/max_x_from_y), result_rdf.max()
+    return out, MagScattVector, YAtMax
 
 def rdf_inter(mdaUniverse: Any, residue: str, atom1: str, atom2: str, start: int = 0, stop: int = 5000)-> NDArray:
     '''
