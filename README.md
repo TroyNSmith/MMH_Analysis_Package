@@ -65,7 +65,9 @@ In VS Code:
 - Use `ctrl+\` to open the terminal and run `pixi shell`.
 - Set the Python interpreter: `Ctrl+Shift+P` &#8594; `Python: Select Interpreter` &#8594; `Pixi env`.
 
-### 6. Push and Pull Changes
+### 6. Pull and Push Changes
+[Git pulling](https://github.com/git-guides/git-pull) allows a user to sync their local branch with a source branch, providing the most recent version to the local machine. Alternatively, a user can provide updates to the source branch from their local branch by [Git pushing](https://github.com/git-guides/git-push). These features are intended to streamline collaboration and version control, ensuring that all contributors are working with the most up-to-date codebase while avoiding the need for manual file transfers. In practice, this means changes can be shared, reviewed, and deployed more efficiently&#8212;all from the command line.
+
 #### Pull:
 ```
 git pull origin main
