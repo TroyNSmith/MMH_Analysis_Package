@@ -26,7 +26,7 @@ git --version
 | Platform | Install Command or Link                                 |
 | -------- | ------------------------------------------------------- |
 | Windows  | Run through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) & follow Linux |
-| Linux    | Run `curl -sSf https://prefix.dev/install.sh | sh`           |
+| Linux    | Run `curl -sSf https://prefix.dev/install.sh \| sh`           |
 
 Verify installation:
 ```
