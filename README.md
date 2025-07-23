@@ -5,7 +5,7 @@ Note that new functionalities are being implemented to provide resources for stu
 
 In the **future**, this package will include Jupyter notebooks to facilitate user interaction with Python scripts as well as ported code from `mdevaluate` due to its limited documentation and steep learning curve.
 
-## Getting Started with Pixi
+## Getting Started
 This project uses [Pixi](https://pixi.sh/latest/) for environment and dependency management. Pixi is a fast, reproducible tool similar to conda, but with better performance, built-in support for scripting and multi-platform environments, and full compatibility with [VS Code](https://code.visualstudio.com/). 
 
 ### 1. Prerequisites
@@ -84,6 +84,7 @@ mkdir Example
 cd Example
 ```
 
+Within the selected directory, clone the git:
 ```
 git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
 cd MMH_Analysis_Package
