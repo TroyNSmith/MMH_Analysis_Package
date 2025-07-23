@@ -22,7 +22,7 @@ Verify installation:
 git --version
 ```
 
-#### Pixi
+#### Pixi (Optional)
 | Platform | Install Command or Link                                 |
 | -------- | ------------------------------------------------------- |
 | Windows  | Run through [WSL](https://learn.microsoft.com/en-us/windows/wsl/install) & follow Linux |
