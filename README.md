@@ -86,7 +86,7 @@ cd Example
 
 Within the selected directory, clone the git:
 ```
-git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
+git clone git@github.com:TroyNSmith/MMH_Analysis_Package.git
 cd MMH_Analysis_Package
 ```
 
