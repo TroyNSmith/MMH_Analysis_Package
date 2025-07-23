@@ -58,6 +58,10 @@ cat ~/.ssh/id_ed25519.pub
 - 5. In the "Title" field, add a descriptive label for the new key. For example, if you're using this for a personal laptop, you might call this key "Personal Laptop".
 - 6. Select the type of key, either authentication or signing. For more information about commit signing, see [About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
 - 7. In the "Key" field, paste your public key.
+- 8. Click **Add SSH key**.
+- 9. If prompted, confirm access to your account on GitHub.
+
+For more information on SSH keys, visit [GitHub Docs](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 
 ```
 git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
