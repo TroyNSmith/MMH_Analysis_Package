@@ -7,24 +7,32 @@
 # Specify a q value for each simulation. If q_values is empty, they will be independently generated instead.
 
 workdirs=(
-    /home/mmh/BrockportMDFiles/PEG_C6H12/298K_PEG92_5_C6H12_7_5/3_prod_NVT_298K
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/298K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/298K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/7_nvt_prod2_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358R/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/298K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
 )
 
-SYS="Bulk"
+SYS="Pore"
 SEGMENTS=1000
 
 q_values=(
-
+    12.57
 )
 
 # Define residues and their atom pairs: format is "RESIDUE ATOM1 ATOM2"
 residue_atom_list=(
-  "DEG OAD1 OAD2"
-  "REG OAR1 OAR2"
-  "TEG OAT1 OAT2"
-  "PEG OAP1 OAP2"
-  "XEG OAX1 OAX2"
-  "HEG OAH1 OAH2"
+    "OCT O01 H00"
 )
 
 # ===== References: Copy and Paste As Needed =====
@@ -101,9 +109,11 @@ fi
 run_python_script() {
     LOGTMP="$(mktemp)"
     if [ ${#q_values[@]} -gt 0 ]; then
-        python main.py -w "$WORKDIR" -sys "$SYS" -s "$SEGMENTS" -a "$ATOM1" "$ATOM2" -r "$RESIDUE" -q "$q" \
-            > >(tee "$LOGTMP") \
-            2> >(tee -a "$LOGTMP" >&2)
+        for q in "${q_values[@]}"; do
+            python main.py -w "$WORKDIR" -sys "$SYS" -s "$SEGMENTS" -a "$ATOM1" "$ATOM2" -r "$RESIDUE" -q "$q" \
+                > >(tee "$LOGTMP") \
+                2> >(tee -a "$LOGTMP" >&2)
+        done
     else
         python main.py -w "$WORKDIR" -sys "$SYS" -s "$SEGMENTS" -a "$ATOM1" "$ATOM2" -r "$RESIDUE" \
             > >(tee "$LOGTMP") \
