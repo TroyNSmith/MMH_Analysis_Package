@@ -36,6 +36,29 @@ pixi --version
 Then restart your terminal (or follow the post-install instructions to update your `PATH`).
 
 ### 2. Clone This Repository
+Follow the steps below to generate an SSH key and get access to this GitHub repository using SSH.
+#### I. Generate an SSH Key (If You Don't Already Have One)
+Open a terminal and run:
+```
+ssh-keygen -t ed25519 -C "your_email@example.com"
+```
+- Press **Enter** to accept the default file location
+- Create a passphrase if you'd like, or press **Enter** to skip
+
+#### II. Add Your SSH Key to GitHub
+- 1. Copy your public SSH key to your clipboard:
+```
+cat ~/.ssh/id_ed25519.pub
+# $${\color{red}Select}$$ and copy the contents of the id_ed25519.pub file
+# displayed in the terminal to your clipboard
+```
+- 2. In the upper-right corner of any page on GitHub, click your profile picture, then click &#9881; **Settings**.
+- 3. In the "Access" section of the sidebar, click  &#128273; **SSH and GPG keys**.
+- 4. Click **New SSH key** or **Add SSH key**.
+- 5. In the "Title" field, add a descriptive label for the new key. For example, if you're using this for a personal laptop, you might call this key "Personal Laptop".
+- 6. Select the type of key, either authentication or signing. For more information about commit signing, see [About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
+- 7. In the "Key" field, paste your public key.
+
 ```
 git clone https://github.com/TroyNSmith/MMH_Analysis_Package.git
 cd MMH_Analysis_Package
