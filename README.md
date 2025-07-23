@@ -52,14 +52,21 @@ cat ~/.ssh/id_ed25519.pub
 - Select and copy the contents of the id_ed25519.pub file
 - displayed in the terminal to your clipboard
 ```
-- &#9313; In the upper-right corner of any page on GitHub, click your profile picture, then click &#9881; **Settings**.
-- &#9314; In the "Access" section of the sidebar, click  &#128273; **SSH and GPG keys**.
-- &#9315; Click **New SSH key** or **Add SSH key**.
-- &#9316; In the "Title" field, add a descriptive label for the new key. For example, if you're using this for a personal laptop, you might call this key "Personal Laptop".
-- &#9317; Select the type of key, either authentication or signing. For more information about commit signing, see [About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
-- &#9318; In the "Key" field, paste your public key.
-- &#9319; Click **Add SSH key**.
-- &#9320; If prompted, confirm access to your account on GitHub.
+&#9313; In the upper-right corner of any page on GitHub, click your profile picture, then click &#9881; **Settings**.
+
+&#9314; In the "Access" section of the sidebar, click  &#128273; **SSH and GPG keys**.
+
+&#9315; Click **New SSH key** or **Add SSH key**.
+
+&#9316; In the "Title" field, add a descriptive label for the new key. For example, if you're using this for a personal laptop, you might call this key "Personal Laptop".
+
+&#9317; Select the type of key, either authentication or signing. For more information about commit signing, see [About commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification).
+
+&#9318; In the "Key" field, paste your public key.
+
+&#9319; Click **Add SSH key**.
+
+&#9320; If prompted, confirm access to your account on GitHub.
 
 For more information on SSH keys, visit [GitHub Docs](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account).
 
