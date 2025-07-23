@@ -49,8 +49,8 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 - 1. Copy your public SSH key to your clipboard:
 ```diff
 cat ~/.ssh/id_ed25519.pub
-# **Select** and copy the contents of the id_ed25519.pub file
-# displayed in the terminal to your clipboard
+- Select and copy the contents of the id_ed25519.pub file
+- displayed in the terminal to your clipboard
 ```
 - 2. In the upper-right corner of any page on GitHub, click your profile picture, then click &#9881; **Settings**.
 - 3. In the "Access" section of the sidebar, click  &#128273; **SSH and GPG keys**.
