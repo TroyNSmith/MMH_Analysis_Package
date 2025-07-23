@@ -1,6 +1,6 @@
 import click
 from pathlib import Path
-from util.traj import reader
+from util.traj import reader, selections
 from traj import rdf
 
 # Test files
@@ -16,15 +16,39 @@ def analyze():
 
 
 @analyze.command()
-@click.option("--topology", default=GRO_FILE, help="Path string to topology file.")
-@click.option("--trajectory", default=XTC_FILE, help="Path string to trajectory file.")
-@click.option("--minimal", is_flag=True, help="Enable minimal analysis.")
-@click.option("--selection", default=None, help="Selection string for analyses.")
-def bulk(topology: str, trajectory: str, minimal: bool, selection: str):
-    """Test function to load a trajectory."""
-    Universe = reader.load_traj(trajectory, topology)
-    radii, g_r = rdf.inter_rdf(Universe, "type O")
-    print(radii, g_r)
+@click.option(
+    "-top", "--topology", default=GRO_FILE, help="Path string to topology file."
+)
+@click.option(
+    "-traj", "--trajectory", default=XTC_FILE, help="Path string to trajectory file."
+)
+@click.option("-min", "--minimal", is_flag=True, help="Enable minimal analysis.")
+@click.option(
+    "-g1",
+    "--group1",
+    default=None,
+    help="Selection string for first reference group in analyses.",
+)
+@click.option(
+    "-g2",
+    "--group2",
+    default=None,
+    help="Selection string for second reference group in analyses.",
+)
+def bulk(
+    Topology: str, Trajectory: str, Minimal: bool, Group1: str, Group2: str = None
+):
+    """
+    Test function to load a trajectory.
+    :param topology: Path string to topology file.
+    :param trajectory: Path string to trajectory file.
+    :param minimal: (False) Whether to run minimal analysis.
+    :param group1: Selection string for first reference group.
+    :param group2: Selection string for second reference group.
+    """
+    Universe = reader.load_traj(Trajectory, Topology)
+    Pairs = selections.select_pairs(Universe, Group1, Group2)
+    R, G_R = rdf.rdf(Universe, Pairs)
     
 
 if __name__ == "__main__":
