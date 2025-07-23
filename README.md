@@ -62,6 +62,7 @@ code .
 
 In VS Code:
 - Install the **Python** extension.
+  *optional*
 - Use `ctrl+\` to open the terminal and run `pixi shell`.
 - Set the Python interpreter: `Ctrl+Shift+P` &#8594; `Python: Select Interpreter` &#8594; `Pixi env`.
 
