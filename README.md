@@ -47,7 +47,7 @@ ssh-keygen -t ed25519 -C "your_email@example.com"
 
 #### II. Add Your SSH Key to GitHub
 - 1. Copy your public SSH key to your clipboard:
-```
+```diff
 cat ~/.ssh/id_ed25519.pub
 # @@Select@@ and copy the contents of the id_ed25519.pub file
 # displayed in the terminal to your clipboard
