@@ -3,7 +3,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 
-class q_Analysis:
+class scattering:
     """
     Class for calculating q value from RDF and performing related analysis.
     """

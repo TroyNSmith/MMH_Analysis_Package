@@ -1,6 +1,6 @@
 import click
 from util.traj import coordinates, selections, correlations
-from traj import rdf
+from analys import rdf
 from functools import partial
 
 # Test files
