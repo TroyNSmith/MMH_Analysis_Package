@@ -48,9 +48,8 @@ def bulk(
     Universe = coordinates.CoordIO.load_traj(trajectory, topology)
     Pairs = selections.select_pairs(Universe, group1, group2)
     traj_com = coordinates.GatherCOM(Universe)
-    print(traj_com)
     RadialBins, RadialDist, magScatteringVector = scattering.Scattering.RDF(Universe, Pairs, RetQ = True)
-    a, b = scattering.Scattering.ShiftedISF(Universe, magScatteringVector, average = True)
+    a, b = scattering.Scattering.ShiftedISF(traj_com, magScatteringVector, average = True)
     
     print(a, b)
 
