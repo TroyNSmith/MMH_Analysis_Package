@@ -1,11 +1,11 @@
 import click
-from util.traj import coordinates, selections, correlations
-from analys import rdf
+from util.traj import coordinates, selections
+from analys import scattering
 from functools import partial
 
 # Test files
-GRO_FILE = "src/tests/adk_oplsaa/adk_oplsaa.gro"
-XTC_FILE = "src/tests/adk_oplsaa/adk_oplsaa.xtc"
+GRO_FILE = "test_files/adk_oplsaa/adk_oplsaa.gro"
+XTC_FILE = "test_files/adk_oplsaa/adk_oplsaa.xtc"
 
 
 @click.group()
@@ -45,12 +45,14 @@ def bulk(
     :param group2: Selection string for first reference group.
     :param group2: Selection string for second reference group.
     """
-    Universe = coordinates.load_traj(trajectory, topology)
+    Universe = coordinates.CoordIO.load_traj(trajectory, topology)
     Pairs = selections.select_pairs(Universe, group1, group2)
-    R, G_R = rdf.q_Analysis.rdf(Universe, Pairs)
-    q = rdf.q_Analysis.scattering_vector(R, G_R)
-    correlations.shifted_correlation(partial(rdf.q_Analysis.incoherent_scattering,q), Universe)
+    traj_com = coordinates.GatherCOM(Universe)
+    print(traj_com)
+    RadialBins, RadialDist, magScatteringVector = scattering.Scattering.RDF(Universe, Pairs, RetQ = True)
+    a, b = scattering.Scattering.ShiftedISF(Universe, magScatteringVector, average = True)
     
+    print(a, b)
 
 if __name__ == "__main__":
     analyze()
