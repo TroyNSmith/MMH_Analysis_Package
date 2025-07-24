@@ -1,6 +1,6 @@
 import mdtraj as md
 import numpy as np
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import NDArray
 
 
 class Scattering:
@@ -10,18 +10,20 @@ class Scattering:
 
     @staticmethod
     def RDF(
-        Universe: md.Trajectory, Pairs: ArrayLike, RetQ: bool = False
+        Universe: md.Trajectory, Selection1: str, Selection2: str, RetQ: bool = False
     ) -> tuple[NDArray, NDArray, float]:
         """
         Compute RDF for pairs in every frame of trajectory using mdtraj. Return the magnitude of the scattering vector (q) if option is toggled.
 
         :param Universe: mdtraj.Trajectory object.
-        :param Pairs: ArrayLike with all atom pairs for selections of interest.
+        :param Selection1: mdtraj-style selection string, e.g., 'resname OCT', 'not resname PORE'.
+        :param Selection2: mdtraj-style selection string, e.g., 'resname OCT', 'not resname PORE'.
         :param RetQ: (False) Return the magnitude of the associated scattering vector.
         :return RadialBins: Numpy array with radial bins in nm.
         :return RadialDist: Numpy array with radial distribution results.
-        :return q: (Optional) Magnitude of the associated scattering vector.
+        :return magScatteringVec: (Optional) Magnitude of the associated scattering vector.
         """
+        Pairs = Universe.topology.select_pairs(Selection1, Selection2)
         RadialBins, RadialDist = md.compute_rdf(Universe, Pairs)
 
         if RetQ:

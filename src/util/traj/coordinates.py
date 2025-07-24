@@ -13,7 +13,9 @@ class CoordIO:
         """
         if ".xtc" in traj:
             if top is None:
-                raise SystemError(".xtc file format requires that a topology file (.gro, .pdb) also be provided.")
+                raise SystemError(
+                    ".xtc file format requires that a topology file (.gro, .pdb) also be provided."
+                )
             return CoordIO._read_xtc(traj, top)
 
     @staticmethod
@@ -27,39 +29,60 @@ class CoordIO:
         """
         return md.load(traj, top=top)
 
-def gatherCOM(Universe: md.Trajectory) -> md.Trajectory:
-    traj = Universe
 
-    residue_names = [residue.name for residue in traj.topology.residues]
-    group_indices = [[atom.index for atom in residue.atoms] for residue in traj.topology.residues]
+def GenCOM(Universe: md.Trajectory, Selection: str = "all") -> md.Trajectory:
+    """
+    Generate a center-of-mass trajectory for selected residues using a selection string.
 
-    masses = np.array([atom.element.mass for atom in traj.topology.atoms])
+    :param Universe: Input trajectory (mdtraj.Trajectory).
+    :param Selection: MDTraj-style selection string, e.g., 'resname OCT', 'not resname PORE'.
+    :return comUniverse: New mdtraj.Trajectory object with COM coordinates per selected residue.
+    """
+    selAtomIdxs = Universe.topology.select(Selection)
+    
+    selRes = [
+        res for res in Universe.topology.residues
+        if any(atom.index in selAtomIdxs for atom in res.atoms)
+    ]
 
-    def compute_com(traj, group_indices, masses):
-        n_frames = traj.n_frames
-        n_groups = len(group_indices)
-        com_xyz = np.zeros((n_frames, n_groups, 3), dtype=np.float32)
+    grIdxs = [[atom.index for atom in res.atoms if atom.index in selAtomIdxs]
+              for res in selRes]
+    
+    grIdxs = [grp for grp in grIdxs if grp]
+    selRes = [res for res, grp in zip(selRes, grIdxs) if grp]
+    Masses = np.array([atom.element.mass for atom in Universe.topology.atoms])
 
-        for g, indices in enumerate(group_indices):
-            group_mass = masses[indices]
-            total_mass = group_mass.sum()
-            weighted_pos = traj.xyz[:, indices, :] * group_mass[None, :, None]
-            com_xyz[:, g, :] = weighted_pos.sum(axis=1) / total_mass
+    def _comCalc(Universe, grIdxs, masses):
+        nFrames = Universe.n_frames
+        nGroups = len(grIdxs)
+        comXYZ = np.zeros((nFrames, nGroups, 3), dtype=np.float32)
 
-        return com_xyz
+        for g, Idxs in enumerate(grIdxs):
+            gMass = masses[Idxs]
+            tMass = gMass.sum()
+            weightedPos = Universe.xyz[:, Idxs, :] * gMass[None, :, None]
+            comXYZ[:, g, :] = weightedPos.sum(axis=1) / tMass
 
-    com_xyz = compute_com(traj, group_indices, masses)
+        return comXYZ
 
-        # Build fake topology with one atom per residue
-    top = md.Topology()
-    chain = top.add_chain()
-    for i, resname in enumerate(residue_names):
-        res = top.add_residue(resname, chain)
-        top.add_atom(f"COM_{i}", md.element.carbon, res)
+    comXYZ = _comCalc(Universe, grIdxs, Masses)
 
-    assert top.n_atoms == com_xyz.shape[1], f"Topology atom count {top.n_atoms} != COM shape {com_xyz.shape[1]}"
+    tempTop = md.Topology()
+    Chain = tempTop.add_chain()
+    for Res in selRes:
+        newRes = tempTop.add_residue(Res.name, Chain)
+        tempTop.add_atom(f"COM_{Res.index}", md.element.carbon, newRes)
 
-    # Construct new trajectory
-    com_traj = md.Trajectory(xyz=com_xyz, topology=top, time=traj.time)
+    assert tempTop.n_atoms == comXYZ.shape[1], (
+        f"Topology atom count {tempTop.n_atoms} != COM shape {comXYZ.shape[1]}"
+    )
 
-    return com_traj
+    comUniverse = md.Trajectory(
+        xyz=comXYZ,
+        topology=tempTop,
+        time=Universe.time,
+        unitcell_angles=Universe.unitcell_angles,
+        unitcell_lengths=Universe.unitcell_lengths,
+    )
+
+    return comUniverse
