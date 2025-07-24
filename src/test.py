@@ -1,11 +1,10 @@
 import click
 from util.traj import coordinates, selections
 from analys import scattering
-from functools import partial
 
 # Test files
-GRO_FILE = "test_files/adk_oplsaa/adk_oplsaa.gro"
-XTC_FILE = "test_files/adk_oplsaa/adk_oplsaa.xtc"
+GRO_FILE = "src/test_files/adk_oplsaa/adk_oplsaa.gro"
+XTC_FILE = "src/test_files/adk_oplsaa/adk_oplsaa.xtc"
 
 
 @click.group()

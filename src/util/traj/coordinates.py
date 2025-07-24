@@ -27,7 +27,7 @@ class CoordIO:
         """
         return md.load(traj, top=top)
 
-def GatherCOM(Universe: md.Trajectory) -> md.Trajectory:
+def gatherCOM(Universe: md.Trajectory) -> md.Trajectory:
     traj = Universe
 
     residue_names = [residue.name for residue in traj.topology.residues]
@@ -55,15 +55,11 @@ def GatherCOM(Universe: md.Trajectory) -> md.Trajectory:
     chain = top.add_chain()
     for i, resname in enumerate(residue_names):
         res = top.add_residue(resname, chain)
-        atom = top.add_atom(f"COM_{i}", md.element.carbon, res)
+        top.add_atom(f"COM_{i}", md.element.carbon, res)
 
-    # Check number of atoms before passing to Trajectory
     assert top.n_atoms == com_xyz.shape[1], f"Topology atom count {top.n_atoms} != COM shape {com_xyz.shape[1]}"
 
     # Construct new trajectory
     com_traj = md.Trajectory(xyz=com_xyz, topology=top, time=traj.time)
-    
-    for atom in com_traj.topology.atoms:
-        print(atom.name)
 
     return com_traj

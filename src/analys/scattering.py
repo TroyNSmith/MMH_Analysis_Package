@@ -25,9 +25,7 @@ class Scattering:
         RadialBins, RadialDist = md.compute_rdf(Universe, Pairs)
 
         if RetQ:
-            magScatteringVec = Scattering._magScatteringVector(
-                RadialBins, RadialDist
-            )
+            magScatteringVec = Scattering._magScatteringVector(RadialBins, RadialDist)
             return RadialBins, RadialDist, magScatteringVec
 
         else:
@@ -45,13 +43,14 @@ class Scattering:
 
         return RadialBins[MaxGIdx]
 
+    @staticmethod
     def ShiftedISF(
         Universe: md.Trajectory,
         magScatteringVec: float,
-        segments: int = 10,
-        window: float = 0.5,
-        skip: float = None,
-        average: bool = False,
+        Segments: int = 10,
+        Window: float = 0.5,
+        Skip: float = None,
+        Average: bool = False,
     ) -> tuple[NDArray, NDArray]:
         """
         Calculate the incoherent intermediate scattering function for an mdtraj.Trajectory object using a shifted window correlation.
@@ -68,66 +67,63 @@ class Scattering:
                 - times: array of time differences (in ps)
                 - isf_data: array of ISF values (1D if averaged, 2D if not)
         """
-        num_frames = Universe.n_frames
-        if skip is None:
-            skip = Universe._slice.start / num_frames if hasattr(Universe, "_slice") else 0
-        assert window + skip < 1, "window + skip must be < 1"
+        nFrames = Universe.n_frames
+        if Skip is None:
+            Skip = (
+                Universe._slice.start / nFrames if hasattr(Universe, "_slice") else 0
+            )
+        assert Window + Skip < 1, "Window + Skip must be < 1"
 
-        # Time segment start indices
-        start_indices = np.unique(
+        StartIndices = np.unique(
             np.linspace(
-                num_frames * skip,
-                num_frames * (1 - window),
-                num=segments,
+                nFrames * Skip,
+                nFrames * (1 - Window),
+                num=Segments,
                 endpoint=False,
                 dtype=int,
             )
         ).astype(int)
 
-        # Number of frames per window
-        num_corr_frames = int(num_frames * window)
+        nCorrFrames = int(nFrames * Window)
 
-        # Logarithmic time steps
-        log_indices = np.unique(
-            np.logspace(0, np.log10(num_corr_frames), num=100, dtype=int)
+        LogIndices = np.unique(
+            np.logspace(0, np.log10(nCorrFrames), num=100, dtype=int)
         )
-        log_indices = log_indices[log_indices < num_corr_frames]
+        LogIndices = LogIndices[LogIndices < nCorrFrames]
 
-        all_isfs = []
+        Results = []
 
-        for start_idx in start_indices:
-            start_xyz = Universe.xyz[start_idx]  # shape: (n_atoms, 3)
-            segment_isf = []
+        for sIdx in StartIndices:
+            sXYZ = Universe.xyz[sIdx]
+            segISF = []
 
-            for offset in log_indices:
-                idx = start_idx + offset
-                if idx >= num_frames:
+            for Offset in LogIndices:
+                nIdx = sIdx + Offset
+                if nIdx >= nFrames:
                     continue
-                target_xyz = Universe.xyz[idx]
+                tXYZ = Universe.xyz[nIdx]       #tXYZ = Target coords
 
-                # Apply minimum image convention if box info is available
                 if Universe.unitcell_lengths is not None:
-                    box_lengths = Universe.unitcell_lengths[idx]
-                    delta = target_xyz - start_xyz
-                    delta -= (
-                        np.round(delta / box_lengths[np.newaxis, :])
-                        * box_lengths[np.newaxis, :]
+                    Edges = Universe.unitcell_lengths[nIdx]
+                    Δ = tXYZ - sXYZ
+                    Δ -= (
+                        np.round(Δ / Edges[np.newaxis, :])
+                        * Edges[np.newaxis, :]
                     )
                 else:
-                    delta = target_xyz - start_xyz
+                    Δ = tXYZ - sXYZ
 
-                distance = np.linalg.norm(delta, axis=1)
-                isf_val = np.sinc(distance * magScatteringVec / np.pi).mean()
-                segment_isf.append(isf_val)
+                Dist = np.linalg.norm(Δ, axis=1)
+                Scat = np.sinc(Dist * magScatteringVec / np.pi).mean()
+                segISF.append(Scat)
 
-            all_isfs.append(segment_isf)
+            Results.append(segISF)
 
-        # Align time axis (in ps)
-        times = Universe.time[log_indices] - Universe.time[0]
-        isf_array = np.array(all_isfs)
+        Times = Universe.time[LogIndices] - Universe.time[0]
+        AllISF = np.array(Results)
 
-        if average:
-            isf_mean = isf_array.mean(axis=0)
-            return times, isf_mean
+        if Average:
+            AvgISF = AllISF.mean(axis=0)
+            return Times, AvgISF
         else:
-            return times, isf_array
+            return Times, AllISF
