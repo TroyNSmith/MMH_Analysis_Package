@@ -28,11 +28,11 @@ for frame in octTraj.frames[:10]:
             if r > rOuter:
                 tracking[i] = True
                 score_list[i].append([decay_func(r)])
+        else:
+            if r > rInner:
+                score_list[i][-1].append(decay_func(r))
             else:
-                if r > rInner:
-                    score_list[i][-1].append(decay_func(r))
-                else:
-                    tracking[i] = False
+                tracking[i] = False
 
 # Flatten all event scores across all molecules
 all_scores = [event for molecule_scores in score_list for event in molecule_scores]
