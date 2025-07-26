@@ -411,13 +411,15 @@ def full(args_dict: dict)-> None:
         pbar.update(1)
 
 # ===== Step 18: Generate hydrogen bonds heatmap =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/HBonds/HBonds_heatmap_{residue}_{atom1}_{atom2}.png') or overwrite:
+        #if not os.path.exists(f'{workdir}/analysis/graphs/HBonds/HBonds_heatmap_{residue}_{atom1}_{atom2}.png') or overwrite:
+        if 1 == 1:
             pbar.set_postfix(step="Calculating hydrogen bonds heatmap")
             hbonds.hbonds_heatmap(mda_universe=mda_universe, residue=residue, atom1=atom1, atom2=atom2, pore_diameter=pore_inf['D'], workdir=workdir, pore=True)
         pbar.update(1)
 
 # ===== Step 19: Generate positional heatmap for any hydrogen bonding species =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/HBonds_heatmap_{atom1}.png') or overwrite:
+        #if not os.path.exists(f'{workdir}/analysis/graphs/HBonds_heatmap_{atom1}.png') or overwrite:
+        if 1 == 1:
             pbar.set_postfix(step="Calculating positional heatmaps")
             structural.radial_distances(mda_universe=mda_universe, workdir = workdir, pore_diameter=pore_inf['D'], exclusions='resname PORE')
         pbar.update(1)

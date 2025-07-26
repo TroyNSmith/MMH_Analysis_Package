@@ -315,7 +315,7 @@ def radial_distances(
         # Iterate over the trajectory
         for dt in mda_universe.trajectory:
             # Get the positions of atoms in the x,y-plane (first two coordinates)
-            positions = atoms.positions[:, :2]
+            positions = atoms.positions[:, :2] / 10
             data.extend(positions)  # Append the positions to data
 
         # Convert data to numpy array
@@ -335,8 +335,10 @@ def radial_distances(
         plt.figure(figsize=(6, 6))
         im = plt.pcolormesh(X, Y, heatmap.T, shading="auto", norm=LogNorm())
         plt.title(f"Radial Distribution Heatmap for Atom: {atom}")
-        plt.xlabel("X (Å)")
-        plt.ylabel("Y (Å)")
+        plt.xlabel("X (nm)")
+        plt.xticks(fontsize=14)
+        plt.ylabel("Y (nm)")
+        plt.yticks(fontsize=14)
         plt.colorbar(im)
 
         plt.savefig(f"{workdir}/analysis/graphs/HBonds/Positions_heatmap_{atom}.png")

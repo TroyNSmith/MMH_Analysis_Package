@@ -27,7 +27,6 @@ SYS="Pore"
 SEGMENTS=1000
 
 q_values=(
-    12.57
 )
 
 # Define residues and their atom pairs: format is "RESIDUE ATOM1 ATOM2"

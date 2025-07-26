@@ -237,7 +237,9 @@ def hbonds_heatmap(mda_universe: Any, residue: str, atom1: str, atom2: str, pore
     plt.figure(figsize=(6, 6))
     im = plt.pcolormesh(X, Y, heatmap.T, shading='auto', norm=LogNorm())
     plt.xlabel("X (nm)")
+    plt.xticks(fontsize=14)
     plt.ylabel("Y (nm)")
+    plt.yticks(fontsize=14)
     plt.colorbar(im)
 
     plt.savefig(f'{workdir}/analysis/graphs/HBonds/HBonds_heatmap_{residue}_{atom1}_{atom2}.png')
