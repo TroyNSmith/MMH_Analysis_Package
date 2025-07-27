@@ -1,6 +1,7 @@
 import numpy as np
 import mdevaluate as mde
 import os
+import warnings
 
 from functools import partial
 from util.Backup import BackupFile
@@ -14,20 +15,23 @@ class TrajectoryAnalysis:
         Topology: str,
         OutputDirectory: str = None,
         nSegments: int = 100,
-        Resname: str = None,
-        Atoms: str = None,
+        ResName: str = None,
+        Atoms: list = None,
         OverwriteExisting: bool = False,
     ):
         self.Coordinates = mde.open(
             directory=SimulationDirectory, trajectory=Trajectory, topology=Topology
         )
 
-        if Resname is not None:
+        if ResName is not None:
+            if Atoms is None:
+                raise ValueError("Two atoms from the topology must be specified when performing residue analysis to facilitate appropriate center of mass calculations.")
             assert len(Atoms) == 2, (
                 "Two atoms corresponding to the designated resname must be provided."
             )
-            self.Resname = Resname
-            self.Coordinates = self._centers_of_masses()
+            self.ResName = ResName
+            self.Coordinates = self._CentersOfMasses()
+            self.Vectors = self._Vectors(Atoms=Atoms)
 
         self.nSegments = nSegments
         self.OverwriteExisting = OverwriteExisting
@@ -36,7 +40,7 @@ class TrajectoryAnalysis:
             self.OutputDirectory = os.path.join(
                 SimulationDirectory,
                 "Analysis/Data_files",
-                f"{Resname}_{Atoms[0]}_{Atoms[1]}" if Resname is not None else "",
+                f"{ResName}_{Atoms[0]}_{Atoms[1]}" if ResName is not None else "",
             )
         else:
             self.OutputDirectory = OutputDirectory
@@ -44,7 +48,7 @@ class TrajectoryAnalysis:
         if not os.path.exists(self.OutputDirectory):
             os.makedirs(self.OutputDirectory)
 
-    def _centers_of_masses(self) -> mde.coordinates.Coordinates:
+    def _CentersOfMasses(self) -> mde.coordinates.Coordinates:
         @mde.coordinates.map_coordinates
         def center_of_masses(coordinates, atoms, shear: bool = False):
             res_ids = coordinates.residue_ids[atoms]
@@ -62,11 +66,32 @@ class TrajectoryAnalysis:
         return center_of_masses(
             self.Coordinates,
             atoms=self.Coordinates.subset(
-                residue_name=self.Resname
+                residue_name=self.ResName
             ).atom_subset.indices,
         ).nojump
 
-    def _multi_radial_selector(
+    def _Vectors(self, Atoms: list):
+        """
+        Return residual vectors pointing from atom 1 to atom 2.
+        """
+        Atom1Idxs = self.Coordinates.subset(
+            atom_name=Atoms[0], residue_name=self.ResName
+        ).atom_subset.indices
+
+        Atom2Idxs = self.Coordinates.subset(
+            atom_name=Atoms[1], residue_name=self.ResName
+        ).atom_subset.indices
+
+        Vectors = mde.coordinates.vectors(
+            self.Coordinates,
+            atom_indices_a=Atom1Idxs,
+            atom_indices_b=Atom2Idxs,
+            normed=True,
+        )
+
+        return Vectors
+
+    def _MultiRadialSelector(
         Atoms: mde.coordinates.CoordinateFrame,
         rBins: np.ndarray,
     ) -> list:
@@ -84,6 +109,32 @@ class TrajectoryAnalysis:
             )
             Indices.append(index)
         return Indices
+
+    def _SaveCSV(self, OutputFile: str, OutArray: np.ndarray, Header: str = None):
+        """
+        Saves a numpy array as a .csv file.
+
+        :param OutputFile: File path to output destination (include filename with .csv extension).
+        :param OutArray: Numpy array to be saved at output.
+        :param Header: Header row for .csv file as a comma separated string.
+        """
+        if ".csv" not in OutputFile:
+            warnings.warn(
+                f"Please include the output file name and .csv extension in {OutputFile}. \
+                              Saving file as {os.path.join(OutputFile, 'Out.csv')} instead."
+            )
+            OutputFile = os.path.join(OutputFile, "Out.csv")
+
+        try:
+            np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
+        except FileNotFoundError:
+            os.makedirs(os.path.dirname(OutputFile))
+            np.savetxt(
+                OutputFile,
+                OutArray,
+                header=Header,
+                delimiter=",",
+            )
 
     def AveISF(
         self,
@@ -134,9 +185,7 @@ class TrajectoryAnalysis:
             t, Results = mde.correlation.shifted_correlation(
                 partial(mde.correlation.isf, q=qLength),
                 self.Coordinates,
-                selector=partial(
-                    TrajectoryAnalysis._multi_radial_selector, rBins=rBins
-                ),
+                selector=partial(TrajectoryAnalysis._MultiRadialSelector, rBins=rBins),
                 segments=self.nSegments,
                 skip=0.0,
             )
@@ -164,16 +213,7 @@ class TrajectoryAnalysis:
 
             OutArray = np.column_stack([t, Results])
 
-        try:
-            np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
-        except FileNotFoundError:
-            os.makedirs(os.path.join(self.OutputDirectory, "ISF"))
-            np.savetxt(
-                OutputFile,
-                OutArray,
-                header=Header,
-                delimiter=",",
-            )
+        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
     def AveMSD(
         self,
@@ -225,7 +265,7 @@ class TrajectoryAnalysis:
                     partial(mde.correlation.msd, axis=Axis),
                     self.Coordinates,
                     selector=partial(
-                        TrajectoryAnalysis._multi_radial_selector, rBins=rBins
+                        TrajectoryAnalysis._MultiRadialSelector, rBins=rBins
                     ),
                     segments=self.nSegments,
                     skip=0.1,
@@ -253,16 +293,7 @@ class TrajectoryAnalysis:
                 )
                 OutArray = np.column_stack([t, Results])
 
-            try:
-                np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
-            except FileNotFoundError:
-                os.makedirs(os.path.join(self.OutputDirectory, "MSD"))
-                np.savetxt(
-                    OutputFile,
-                    OutArray,
-                    header=Header,
-                    delimiter=",",
-                )
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
     def nonGauss(self):
         """
@@ -295,16 +326,7 @@ class TrajectoryAnalysis:
 
         OutArray = np.column_stack([t, Result])
 
-        try:
-            np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
-        except FileNotFoundError:
-            os.makedirs(os.path.join(self.OutputDirectory, "Etc"))
-            np.savetxt(
-                OutputFile,
-                OutArray,
-                header=Header,
-                delimiter=",",
-            )
+        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
     def RDF(self, rMax: float = 3.0, nBins: int = 1000, ReturnQ: bool = True) -> float:
         """
@@ -332,16 +354,7 @@ class TrajectoryAnalysis:
         OutArray = np.column_stack([Bins[:-1], Results])
 
         if not os.path.exists(OutputFile):
-            try:
-                np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
-            except FileNotFoundError:
-                os.makedirs(os.path.join(self.OutputDirectory, "RDF"))
-                np.savetxt(
-                    OutputFile,
-                    OutArray,
-                    header=Header,
-                    delimiter=",",
-                )
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
         else:
             if self.OverwriteExisting:
                 BackupFile(OutputFile)
@@ -408,16 +421,18 @@ class TrajectoryAnalysis:
                 OutArray = np.column_stack([OutArray, col])
 
         elif Rotational:
-            assert Diameter > 0.0, (
-                "System diameter must be provided for radially resolved results."
-            )
-            assert nBins > 0, "Please specify a quantity of radial bins to use."
 
-            Radius = Diameter / 2 + Buffer
+            def _vanHoveAngleDist(start, end, aBins):
+                ScalarProduct = (start * end).sum(axis=-1)
+                Angle = np.arccos(ScalarProduct)
+                Angle = Angle[(Angle >= 0) * (Angle <= np.pi)]
+                Histogram, _ = np.histogram(Angle * 360 / (2 * np.pi), aBins)
+                return 1 / len(start) * Histogram
 
-            rBins = np.arange(0.0, Radius + Radius / nBins, Radius / nBins)
+            aBins = np.linspace(0, 180, 361)
+            x = aBins[1:] - (aBins[1] - aBins[0]) / 2
 
-            Filename = f"Etc/TranslVanHove_{nBins}bins.csv"
+            Filename = "Etc/RotVanHove.csv"
             OutputFile = os.path.join(self.OutputDirectory, Filename)
 
             if os.path.exists(OutputFile):
@@ -426,30 +441,27 @@ class TrajectoryAnalysis:
                 else:
                     return
 
-            Header = "Time / ps," + ",".join(
-                [
-                    f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
-                    for i in range(len(rBins) - 1)
-                ]
+            x = aBins[1:] - (aBins[1] - aBins[0]) / 2
+
+            Time, Result = mde.correlation.shifted_correlation(
+                partial(_vanHoveAngleDist, aBins=aBins),
+                self.Vectors,
+                segments=self.nSegments,
             )
+            t = np.array([t_i for t_i in Time for entry in x])
+            Angle = np.array([entry for t_i in Time for entry in x])
 
+            OutArray = np.column_stack([t, Angle, Result.flatten()])
 
+            Header = [f"{t} ps" for t in np.unique(OutArray[:, 0])[5::10]]
 
-            OutArray = t
-            for col in Results.T:
-                OutArray = np.column_stack([OutArray, col])
+        else:
+            raise ValueError(
+                "Please designate either translational or rotational for van Hove analysis."
+            )
 
         try:
-            np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
-        except FileNotFoundError:
-            os.makedirs(os.path.join(self.OutputDirectory, "Etc"))
-            np.savetxt(
-                OutputFile,
-                OutArray,
-                header=Header,
-                delimiter=",",
-            )
-        
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
         except UnboundLocalError:
             raise UnboundLocalError(
                 "Please designate a type of van Hove function to analyze (translational or rotational)."

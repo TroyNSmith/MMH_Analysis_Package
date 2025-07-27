@@ -98,20 +98,21 @@ def Pore(
         Trajectory=Trajectory,
         Topology=Topology,
         nSegments=nSegments,
-        Resname=Resname,
+        ResName=Resname,
         Atoms=Atoms,
         OutputDirectory=OutputDirectory,
         OverwriteExisting=Overwrite,
     )
 
     CoordFrameAnalysis.AveMSD(Axes='all and x and xy')                                          # Mean square displacement in universe (total), x-direction, and xy-plane
-    CoordFrameAnalysis.AveMSD(Resolved=True, nBins=5, Diameter=Diameter)                        # Radially resolved mean square displacement in universe (total)
+    CoordFrameAnalysis.AveMSD(Resolved=True, Axes='all and xy', nBins=7, Diameter=Diameter)     # Radially resolved mean square displacement in universe (total) and xy-plane
     CoordFrameAnalysis.RDF(ReturnQ=False)                                                       # Radial distribution function
     CoordFrameAnalysis.AveISF(qLength=qLength)                                                  # Overall ISF
     CoordFrameAnalysis.AveISF(qLength=qLength, Resolved=True, nBins=3, Diameter=Diameter)       # Radially binned ISF (3 bins)
     CoordFrameAnalysis.AveISF(qLength=qLength, Resolved=True, nBins=10, Diameter=Diameter)      # Radially binned ISF (10 bins)
     CoordFrameAnalysis.nonGauss()                                                               # Non-Gaussian Displacement Statistics
     CoordFrameAnalysis.vanHove(Translational=True, Diameter=Diameter, nBins=15)                 # Translational van Hove dynamics
+    CoordFrameAnalysis.vanHove(Rotational=True)                 # Translational van Hove dynamics
 
 cli.add_command(Pore)
 
