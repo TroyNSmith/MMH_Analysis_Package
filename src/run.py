@@ -31,7 +31,7 @@ def cli():
 @click.option(
     "-res",
     "--resname",
-    "Resname",
+    "ResName",
     help="Name of the residue to be analyzed.",
     default=None,
 )
@@ -86,7 +86,7 @@ def Pore(
     Trajectory: str,
     Topology: str,
     nSegments: int,
-    Resname: str,
+    ResName: str,
     Atoms: str,
     Diameter: float,
     qLength: float,
@@ -98,26 +98,54 @@ def Pore(
         Trajectory=Trajectory,
         Topology=Topology,
         nSegments=nSegments,
-        ResName=Resname,
+        ResName=ResName,
         Atoms=Atoms,
         OutputDirectory=OutputDirectory,
         OverwriteExisting=Overwrite,
     )
 
-    CoordFrameAnalysis.AveMSD(Axes='all and x and xy')                                          # Mean square displacement in universe (total), x-direction, and xy-plane
-    CoordFrameAnalysis.AveMSD(Resolved=True, Axes='all and xy', nBins=7, Diameter=Diameter)     # Radially resolved mean square displacement in universe (total) and xy-plane
-    CoordFrameAnalysis.InterRDF(ReturnQ=False)                                                       # Radial distribution function
-    CoordFrameAnalysis.AveISF(qLength=qLength)                                                  # Overall ISF
-    CoordFrameAnalysis.AveISF(qLength=qLength, Resolved=True, nBins=3, Diameter=Diameter)       # Radially binned ISF (3 bins)
-    CoordFrameAnalysis.AveISF(qLength=qLength, Resolved=True, nBins=10, Diameter=Diameter)      # Radially binned ISF (10 bins)
-    CoordFrameAnalysis.nonGauss()                                                               # Non-Gaussian Displacement Statistics
-    CoordFrameAnalysis.vanHove(Translational=True, Diameter=Diameter, nBins=15)                 # Translational van Hove dynamics
-    CoordFrameAnalysis.vanHove(Rotational=True)                                                 # Rotational van Hove dynamics
+    CoordFrameAnalysis.AveMSD(
+        Axes="all and x and xy"
+    )  # Mean square displacement in universe (total), x-direction, and xy-plane
+    CoordFrameAnalysis.AveMSD(
+        Resolved=True, Axes="all and xy", nBins=7, Diameter=Diameter
+    )  # Radially resolved mean square displacement in universe (total) and xy-plane
+    CoordFrameAnalysis.RDF(ReturnQ=False, Mode="COM")    # Radial distribution function
+    CoordFrameAnalysis.RDF(ReturnQ=False, Mode="Total")  # Radial distribution function
+    CoordFrameAnalysis.RDF(ReturnQ=False, Mode="Intra")  # Radial distribution function
+    CoordFrameAnalysis.RDF(ReturnQ=False, Mode="Inter")  # Radial distribution function
+    CoordFrameAnalysis.AveISF(qLength=qLength)  # Overall ISF
+    CoordFrameAnalysis.AveISF(
+        qLength=qLength, Resolved=True, nBins=3, Diameter=Diameter
+    )  # Radially binned ISF (3 bins)
+    CoordFrameAnalysis.AveISF(
+        qLength=qLength, Resolved=True, nBins=10, Diameter=Diameter
+    )  # Radially binned ISF (10 bins)
+    CoordFrameAnalysis.nonGauss()  # Non-Gaussian Displacement Statistics
+    CoordFrameAnalysis.vanHove(
+        Translational=True, Diameter=Diameter, nBins=15
+    )  # Translational van Hove dynamics
+    CoordFrameAnalysis.vanHove(Rotational=True)  # Rotational van Hove dynamics
     CoordFrameAnalysis.Chi4Susceptibility()
     CoordFrameAnalysis.zAxisAlignment()
     CoordFrameAnalysis.zAxisRadialPos()
+    CoordFrameAnalysis.RadialDensity(
+        Groups=[
+            [Atoms[0], ResName],
+            [Atoms[1], ResName],
+            ["NL", "LNK"],
+            ["OEE", "ETH"],
+            ["NV", "VAN"],
+            ["OVE", "VAN"],
+            ["OVH", "VAN"],
+        ],
+        nBins=150,
+        Diameter=Diameter,
+    )
+    CoordFrameAnalysis.HydrogenBonds()
+
 
 cli.add_command(Pore)
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
     cli()

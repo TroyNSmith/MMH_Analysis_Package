@@ -93,7 +93,7 @@ def rdf(
     atoms_a: CoordinateFrame,
     atoms_b: Optional[CoordinateFrame] = None,
     bins: Optional[ArrayLike] = None,
-    remove_intra: bool = False,
+    Mode: str = 'Total',
     **kwargs
 ) -> NDArray:
     r"""
@@ -112,7 +112,7 @@ def rdf(
         atoms_a: First set of atoms, used internally
         atoms_b (opt.): Second set of atoms, used internal
         bins: Bins of the radial distribution function
-        remove_intra: removes contributions from intra molecular pairs
+        mode: 'Total' | 'Intra' | 'Inter'
     """
     distinct = True
     if atoms_b is None:
@@ -135,7 +135,7 @@ def rdf(
         **kwargs
     )
 
-    if remove_intra:
+    if Mode == "Inter":
         new_distances = []
         for entry in list(zip(atoms_a.residue_ids, distances, indices)):
             mask = entry[1] < np.inf
@@ -143,6 +143,17 @@ def rdf(
                 entry[1][mask][atoms_b.residue_ids[entry[2][mask]] != entry[0]]
             )
         distances = np.concatenate(new_distances)
+
+    elif Mode == "Intra":
+        new_distances = []
+        for entry in zip(atoms_a.residue_ids, distances, indices):
+            mask = entry[1] < np.inf
+            atom_a_resid = entry[0]
+            valid_indices = entry[2][mask]
+            intra_mask = atoms_b.residue_ids[valid_indices] == atom_a_resid
+            new_distances.append(entry[1][mask][intra_mask])
+        distances = np.concatenate(new_distances)
+
     else:
         distances = [d for dist in distances for d in dist]
 

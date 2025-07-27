@@ -19,7 +19,7 @@ class TrajectoryAnalysis:
         Atoms: list = None,
         OverwriteExisting: bool = False,
     ):
-        self.Coordinates = mde.open(
+        self.InitCoordinates = mde.open(
             directory=SimulationDirectory, trajectory=Trajectory, topology=Topology
         )
 
@@ -31,9 +31,13 @@ class TrajectoryAnalysis:
             assert len(Atoms) == 2, (
                 "Two atoms corresponding to the designated resname must be provided."
             )
+            self.Atoms = Atoms
             self.ResName = ResName
-            self.Vectors = self._Vectors(Atoms=Atoms)
+            self.Vectors = self._Vectors()
             self.Coordinates = self._CentersOfMasses()
+
+        else:
+            self.Coordinates = self.InitCoordinates
 
         self.nSegments = nSegments
         self.OverwriteExisting = OverwriteExisting
@@ -66,26 +70,26 @@ class TrajectoryAnalysis:
             return np.array(positions)
 
         return center_of_masses(
-            self.Coordinates,
-            atoms=self.Coordinates.subset(
+            self.InitCoordinates,
+            atoms=self.InitCoordinates.subset(
                 residue_name=self.ResName
             ).atom_subset.indices,
         ).nojump
 
-    def _Vectors(self, Atoms: list):
+    def _Vectors(self):
         """
         Return residual vectors pointing from atom 1 to atom 2.
         """
-        Atom1Idxs = self.Coordinates.subset(
-            atom_name=Atoms[0], residue_name=self.ResName
+        Atom1Idxs = self.InitCoordinates.subset(
+            atom_name=self.Atoms[0], residue_name=self.ResName
         ).atom_subset.indices
 
-        Atom2Idxs = self.Coordinates.subset(
-            atom_name=Atoms[1], residue_name=self.ResName
+        Atom2Idxs = self.InitCoordinates.subset(
+            atom_name=self.Atoms[1], residue_name=self.ResName
         ).atom_subset.indices
 
         Vectors = mde.coordinates.vectors(
-            self.Coordinates,
+            self.InitCoordinates,
             atom_indices_a=Atom1Idxs,
             atom_indices_b=Atom2Idxs,
             normed=True,
@@ -93,6 +97,7 @@ class TrajectoryAnalysis:
 
         return Vectors
 
+    @staticmethod
     def _MultiRadialSelector(
         Atoms: mde.coordinates.CoordinateFrame,
         rBins: np.ndarray,
@@ -102,15 +107,15 @@ class TrajectoryAnalysis:
 
         :param Trajectory: CoordinateFrame object from mdevaluate.
         :param rBins: Radial bins for sorting.
-        :return Indices: Sorted list of atom indices by radial bin.
+        :return Idxs: Sorted list of atom indices by radial bin.
         """
-        Indices = []
+        Idxs = []
         for i in range(len(rBins) - 1):
-            index = mde.coordinates.selector_radial_cylindrical(
+            Idx = mde.coordinates.selector_radial_cylindrical(
                 Atoms, r_min=rBins[i], r_max=rBins[i + 1]
             )
-            Indices.append(index)
-        return Indices
+            Idxs.append(Idx)
+        return Idxs
 
     def _SaveCSV(self, OutputFile: str, OutArray: np.ndarray, Header: str = None):
         """
@@ -156,7 +161,7 @@ class TrajectoryAnalysis:
         :param Buffer: Distance to buffer the radius beyond the diameter of system.
         """
         if qLength is None:
-            qLength = self.InterRDF()
+            qLength = self.RDF(Mode="COM")
 
         if Resolved:
             assert Diameter > 0.0, (
@@ -305,7 +310,7 @@ class TrajectoryAnalysis:
         :param qLength: Length of the scattering vector, q.
         """
         if qLength is None:
-            qLength = self.InterRDF()
+            qLength = self.RDF()
 
         Filename = "Etc/Chi4.csv"
         OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -365,44 +370,139 @@ class TrajectoryAnalysis:
 
         self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
-    def InterRDF(self, rMax: float = 3.0, nBins: int = 1000, ReturnQ: bool = True) -> float:
+    def RadialDensity(
+        self,
+        Diameter: float,
+        Groups: list = None,
+        nBins: int = 100,
+        Buffer: float = 0.1,
+    ):
+        """
+        Calculates radial density functions for atom, residue pairs specified in Groups.
+
+        :param Diameter: Diameter of the analyzed system.
+        :param Groups: A list of atom, residue pairs to perform analysis on. Example: [['O01', 'OCT'], ['CO0', 'OCT'], ['ATOM', 'RES'], ...]
+        :param nBins: Number of bins to divide the radius into.
+        :param Buffer: Distance to buffer the radius beyond the diameter of system.
+        """
+        Filename = "RDF/Radial_Densities.csv"
+        OutputFile = os.path.join(self.OutputDirectory, Filename)
+
+        if os.path.exists(OutputFile):
+            if self.OverwriteExisting:
+                BackupFile(OutputFile)
+            else:
+                return
+
+        assert Diameter > 0.0, (
+            "System diameter must be provided for radially resolved results."
+        )
+
+        Radius = Diameter / 2 + Buffer
+        rBins = np.arange(0.0, Radius + Radius / nBins, Radius / nBins)
+
+        r = 0.5 * (rBins[:-1] + rBins[1:])
+
+        Header = "r / nm," + ",".join(
+            [f"{Groups[i][1]}:{Groups[i][0]}" for i in range(len(Groups))]
+        )
+
+        Results = []
+        if Groups is not None:
+            for AtomName, ResName in Groups:
+                Result = mde.distribution.time_average(
+                    partial(mde.distribution.radial_density, bins=rBins),
+                    self.InitCoordinates.subset(
+                        atom_name=AtomName, residue_name=ResName
+                    ),
+                    segments=self.nSegments,
+                    skip=0.01,
+                )
+                Results.append(Result)
+
+        OutArray = r
+        for Result in Results:
+            OutArray = np.column_stack([OutArray, Result])
+
+        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        return
+
+    def RDF(
+        self, rMax: float = 2.5, ReturnQ: bool = True, Mode: str = "Total"
+    ) -> float:
         """
         Computes a radial distribution function (RDF) to a distance rMax.
 
         :param rMax: RDF radial distance cut-off value in nm.
         :param nBins: Number of segments of the radius to consider.
         :param ReturnQ: Whether to return the magnitude of the scattering vector, q.
+        :param Mode: "COM" | "Total" | "Intra" | "Inter"
 
         :return qLength: Magnitude of the scattering vector, q.
         """
+        if Mode == "COM":
+            Filename = "RDF/COM_RDF.csv"
+            OutputFile = os.path.join(self.OutputDirectory, Filename)
 
-        Filename = "RDF/Inter_RDF.csv"
-        OutputFile = os.path.join(self.OutputDirectory, Filename)
+            Header = "r / nm, G(r)"
 
-        Header = "r / nm, G(r)"
+            Bins = np.arange(0, rMax, 0.01)
+            Results = mde.distribution.time_average(
+                partial(mde.distribution.rdf, bins=Bins),
+                self.Coordinates,
+                segments=self.nSegments,
+                skip=0.01,
+            )
+            OutArray = np.column_stack([Bins[:-1], Results])
 
-        Bins = np.arange(0, rMax, rMax / nBins)
-        Results = mde.distribution.time_average(
-            partial(mde.distribution.rdf, bins=Bins),
-            self.Coordinates,
-            segments=self.nSegments,
-            skip=0.01,
-        )
-        OutArray = np.column_stack([Bins[:-1], Results])
+            if not os.path.exists(OutputFile):
+                self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+            else:
+                if self.OverwriteExisting:
+                    BackupFile(OutputFile)
+                    np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
 
-        if not os.path.exists(OutputFile):
-            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+            if ReturnQ:
+                YMaxIdx = np.argmax(OutArray[:, 1])
+                XAtMax = OutArray[YMaxIdx, 0]
+                qLength = 2 * np.pi / XAtMax
+
+                return qLength
+
         else:
-            if self.OverwriteExisting:
-                BackupFile(OutputFile)
-                np.savetxt(OutputFile, OutArray, header=Header, delimiter=",")
+            assert len(self.Atoms) == 2, (
+                "Two atoms and their corresponding residue(s) must be specified when performing non-COM RDFS."
+            )
+            Filename = f"RDF/{Mode}_RDF.csv"
+            OutputFile = os.path.join(self.OutputDirectory, Filename)
 
-        if ReturnQ:
-            YMaxIdx = np.argmax(OutArray[:, 1])
-            XAtMax = OutArray[YMaxIdx, 0]
-            qLength = 2 * np.pi / XAtMax
+            if os.path.exists(OutputFile):
+                if self.OverwriteExisting:
+                    BackupFile(OutputFile)
+                else:
+                    return
 
-            return qLength
+            Header = "r / nm, G(r)"
+
+            Atom1Coords = self.InitCoordinates.subset(
+                atom_name=self.Atoms[0], residue_name=self.ResName
+            )
+
+            Atom2Coords = self.InitCoordinates.subset(
+                atom_name=self.Atoms[1], residue_name=self.ResName
+            )
+
+            Bins = np.arange(0, rMax, 0.01)
+            Results = mde.distribution.time_average(
+                function=partial(mde.distribution.rdf, bins=Bins, Mode=Mode),
+                coordinates=Atom1Coords,
+                coordinates_b=Atom2Coords,
+                segments=self.nSegments,
+            )
+            OutArray = np.column_stack([Bins[:-1], Results])
+
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
     def vanHove(
         self,
@@ -556,9 +656,9 @@ class TrajectoryAnalysis:
                 BackupFile(OutputFile)
             else:
                 return
-            
+
         Header = "t / ps, Angle / degrees, Result"
-            
+
         rBins = np.linspace(-1, 1, 201)
         x = rBins[1:] - (rBins[1] - rBins[0]) / 2
 
@@ -569,7 +669,7 @@ class TrajectoryAnalysis:
             return 1 / len(start) * Histogram
 
         Time, Result = mde.correlation.shifted_correlation(
-            partial(z_comp, bins=rBins), self.Vectors, segments=self.nSegments
+            partial(z_comp, rBins=rBins), self.Vectors, segments=self.nSegments
         )
 
         t = np.array([t_i for t_i in Time for entry in x])

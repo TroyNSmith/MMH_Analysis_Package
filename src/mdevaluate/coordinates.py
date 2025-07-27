@@ -396,7 +396,6 @@ def selector_radial_cylindrical(
     index = np.argwhere((r >= r_min) * (r < r_max))
     return index.flatten()
 
-
 def map_coordinates(
     func: Callable[[CoordinateFrame, ...], NDArray]
 ) -> Callable[..., CoordinatesMap]:
