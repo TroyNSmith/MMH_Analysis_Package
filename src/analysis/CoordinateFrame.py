@@ -25,13 +25,15 @@ class TrajectoryAnalysis:
 
         if ResName is not None:
             if Atoms is None:
-                raise ValueError("Two atoms from the topology must be specified when performing residue analysis to facilitate appropriate center of mass calculations.")
+                raise ValueError(
+                    "Two atoms from the topology must be specified when performing residue analysis to facilitate appropriate center of mass calculations."
+                )
             assert len(Atoms) == 2, (
                 "Two atoms corresponding to the designated resname must be provided."
             )
             self.ResName = ResName
-            self.Coordinates = self._CentersOfMasses()
             self.Vectors = self._Vectors(Atoms=Atoms)
+            self.Coordinates = self._CentersOfMasses()
 
         self.nSegments = nSegments
         self.OverwriteExisting = OverwriteExisting
@@ -154,7 +156,7 @@ class TrajectoryAnalysis:
         :param Buffer: Distance to buffer the radius beyond the diameter of system.
         """
         if qLength is None:
-            qLength = self.RDF()
+            qLength = self.InterRDF()
 
         if Resolved:
             assert Diameter > 0.0, (
@@ -193,6 +195,7 @@ class TrajectoryAnalysis:
             OutArray = t
             for col in Results:
                 OutArray = np.column_stack([OutArray, col])
+
         else:
             Filename = "ISF/ISF.csv"
             OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -295,6 +298,40 @@ class TrajectoryAnalysis:
 
             self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
+    def Chi4Susceptibility(self, qLength: float = None):
+        """
+        Calculates fourth-order susceptibility based on provided coordinates.
+
+        :param qLength: Length of the scattering vector, q.
+        """
+        if qLength is None:
+            qLength = self.InterRDF()
+
+        Filename = "Etc/Chi4.csv"
+        OutputFile = os.path.join(self.OutputDirectory, Filename)
+
+        if os.path.exists(OutputFile):
+            if self.OverwriteExisting:
+                BackupFile(OutputFile)
+            else:
+                return
+
+        Header = "t / ps, Chi4, Chi4 (Rolling Average)"
+
+        t, Results = mde.correlation.shifted_correlation(
+            partial(mde.correlation.isf, q=qLength),
+            self.Coordinates,
+            average=False,
+            segments=50,
+        )
+
+        RawResults = len(self.Coordinates[0]) * Results.var(axis=0) * 1e5
+        SmoothedResults = mde.utils.moving_average(RawResults, 5)
+
+        OutArray = np.column_stack([t[2:-2], RawResults[2:-2], SmoothedResults])
+
+        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
     def nonGauss(self):
         """
         Calculates non-Gaussian displacements based on centers of masses.
@@ -328,7 +365,7 @@ class TrajectoryAnalysis:
 
         self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
-    def RDF(self, rMax: float = 3.0, nBins: int = 1000, ReturnQ: bool = True) -> float:
+    def InterRDF(self, rMax: float = 3.0, nBins: int = 1000, ReturnQ: bool = True) -> float:
         """
         Computes a radial distribution function (RDF) to a distance rMax.
 
@@ -444,8 +481,8 @@ class TrajectoryAnalysis:
             x = aBins[1:] - (aBins[1] - aBins[0]) / 2
 
             Time, Result = mde.correlation.shifted_correlation(
-                partial(_vanHoveAngleDist, aBins=aBins),
-                self.Vectors,
+                function=partial(_vanHoveAngleDist, aBins=aBins),
+                frames=self.Vectors,
                 segments=self.nSegments,
             )
             t = np.array([t_i for t_i in Time for entry in x])
@@ -453,7 +490,7 @@ class TrajectoryAnalysis:
 
             OutArray = np.column_stack([t, Angle, Result.flatten()])
 
-            Header = [f"{t} ps" for t in np.unique(OutArray[:, 0])[5::10]]
+            Header = "t / ps, Angle / degrees, Result"
 
         else:
             raise ValueError(
@@ -466,3 +503,78 @@ class TrajectoryAnalysis:
             raise UnboundLocalError(
                 "Please designate a type of van Hove function to analyze (translational or rotational)."
             )
+
+    def zAxisAlignment(self):
+        """
+        Calculates residual vectors' alignment with Z axis.
+        """
+
+        Filename = "Etc/zAxis_Alignment.csv"
+        OutputFile = os.path.join(self.OutputDirectory, Filename)
+
+        if os.path.exists(OutputFile):
+            if self.OverwriteExisting:
+                BackupFile(OutputFile)
+            else:
+                return
+
+        Header = "t / ps, Angle / degrees, Result"
+
+        zVector = [0, 0, 1]
+        aBins = np.linspace(0, 180, 361)
+        x = aBins[1:] - (aBins[1] - aBins[0]) / 2
+
+        def _Angles(start, end, zVector, aBins):
+            Angle = np.arccos((start * zVector).sum(axis=-1))
+            Angle = Angle[(Angle >= 0) * (Angle <= np.pi)]
+            Histogram, _ = np.histogram(Angle * 360 / (2 * np.pi), aBins)
+            return 1 / len(start) * Histogram
+
+        Time, Result = mde.correlation.shifted_correlation(
+            partial(_Angles, zVector=zVector, aBins=aBins),
+            self.Vectors,
+            segments=self.nSegments,
+        )
+
+        t = np.array([t_i for t_i in Time for entry in x])
+        Angle = np.array([entry for t_i in Time for entry in x])
+
+        OutArray = np.column_stack([t, Angle, Result.flatten()])
+
+        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+    def zAxisRadialPos(self):
+        """
+        Calculates Z-axis radial positions.
+        """
+
+        Filename = "Etc/zAxis_Radial_Positions.csv"
+        OutputFile = os.path.join(self.OutputDirectory, Filename)
+
+        if os.path.exists(OutputFile):
+            if self.OverwriteExisting:
+                BackupFile(OutputFile)
+            else:
+                return
+            
+        Header = "t / ps, Angle / degrees, Result"
+            
+        rBins = np.linspace(-1, 1, 201)
+        x = rBins[1:] - (rBins[1] - rBins[0]) / 2
+
+        def z_comp(start, end, rBins):
+            VectorsLengths = np.linalg.norm(start, axis=1)
+            zComponent = start[:, 2] / VectorsLengths
+            Histogram, _ = np.histogram(zComponent, rBins)
+            return 1 / len(start) * Histogram
+
+        Time, Result = mde.correlation.shifted_correlation(
+            partial(z_comp, bins=rBins), self.Vectors, segments=self.nSegments
+        )
+
+        t = np.array([t_i for t_i in Time for entry in x])
+        Angle = np.array([entry for t_i in Time for entry in x])
+
+        OutArray = np.column_stack([t, Angle, Result.flatten()])
+
+        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)

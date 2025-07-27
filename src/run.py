@@ -106,15 +106,18 @@ def Pore(
 
     CoordFrameAnalysis.AveMSD(Axes='all and x and xy')                                          # Mean square displacement in universe (total), x-direction, and xy-plane
     CoordFrameAnalysis.AveMSD(Resolved=True, Axes='all and xy', nBins=7, Diameter=Diameter)     # Radially resolved mean square displacement in universe (total) and xy-plane
-    CoordFrameAnalysis.RDF(ReturnQ=False)                                                       # Radial distribution function
+    CoordFrameAnalysis.InterRDF(ReturnQ=False)                                                       # Radial distribution function
     CoordFrameAnalysis.AveISF(qLength=qLength)                                                  # Overall ISF
     CoordFrameAnalysis.AveISF(qLength=qLength, Resolved=True, nBins=3, Diameter=Diameter)       # Radially binned ISF (3 bins)
     CoordFrameAnalysis.AveISF(qLength=qLength, Resolved=True, nBins=10, Diameter=Diameter)      # Radially binned ISF (10 bins)
     CoordFrameAnalysis.nonGauss()                                                               # Non-Gaussian Displacement Statistics
     CoordFrameAnalysis.vanHove(Translational=True, Diameter=Diameter, nBins=15)                 # Translational van Hove dynamics
-    CoordFrameAnalysis.vanHove(Rotational=True)                 # Translational van Hove dynamics
+    CoordFrameAnalysis.vanHove(Rotational=True)                                                 # Rotational van Hove dynamics
+    CoordFrameAnalysis.Chi4Susceptibility()
+    CoordFrameAnalysis.zAxisAlignment()
+    CoordFrameAnalysis.zAxisRadialPos()
 
 cli.add_command(Pore)
 
-if __name__ == "__main__":
+if __name__ == "__main__":  
     cli()
