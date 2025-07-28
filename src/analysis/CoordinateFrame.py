@@ -1,8 +1,11 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import mdevaluate as mde
 import os
+import pandas as pd
 import warnings
 
+from cycler import cycler
 from functools import partial
 from util.Backup import BackupFile
 
@@ -13,6 +16,7 @@ class TrajectoryAnalysis:
         SimulationDirectory: str,
         Trajectory: str,
         Topology: str,
+        PlottingMode: str,
         OutputDirectory: str = None,
         nSegments: int = 100,
         ResName: str = None,
@@ -41,6 +45,7 @@ class TrajectoryAnalysis:
 
         self.nSegments = nSegments
         self.OverwriteExisting = OverwriteExisting
+        self.PlottingMode = PlottingMode
 
         if OutputDirectory is None:
             self.OutputDirectory = os.path.join(
@@ -117,6 +122,70 @@ class TrajectoryAnalysis:
             Idxs.append(Idx)
         return Idxs
 
+    @staticmethod
+    def _LinePlot(
+        PlotName: str,
+        XData: pd.DataFrame,
+        YData: pd.DataFrame,
+        XAxisLabel: str = "",
+        XScale: str = "linear",
+        YAxisLabel: str = "",
+        YScale: str = "linear",
+        UseHeaders: bool = True,
+        PlotSize: tuple = (8, 6),
+        AxisFontSize: float = 16,
+        TickFontSize: float = 14,
+        ColorCycler: list = None,
+    ):
+        if len(YData.columns.to_list()) <= 1:
+            UseHeaders = False
+
+        if ColorCycler is None:
+            ColorCycler = cycler(
+                "color",
+                [
+                    "#CC6677",
+                    "#332288",
+                    "#DDCC77",
+                    "#117733",
+                    "#88CCEE",
+                    "#882255",
+                    "#44AA99",
+                    "#999933",
+                    "#AA4499",
+                    "#77AADD",
+                    "#EE8866",
+                    "#EEDD88",
+                    "#FFAABB",
+                    "#99DDFF",
+                    "#44BB99",
+                    "#BBCC33",
+                    "#AAAA00",
+                    "#DDDDDD",
+                ],
+            )
+
+        Labels = YData.columns if UseHeaders else None
+        plt.rc("axes", prop_cycle=ColorCycler)
+
+        fig, ax = plt.subplots(figsize=PlotSize)
+
+        ax.plot(XData, YData, label=Labels)
+
+        ax.set_xlabel(XAxisLabel, fontsize=AxisFontSize)
+        ax.set_xscale(XScale)
+        ax.tick_params(axis="x", labelsize=TickFontSize)
+
+        ax.set_ylabel(YAxisLabel, fontsize=AxisFontSize)
+        ax.set_yscale(YScale)
+        ax.tick_params(axis="y", labelsize=TickFontSize)
+
+        ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+
+        fig.tight_layout()
+
+        fig.savefig(PlotName)
+
     def _SaveCSV(self, OutputFile: str, OutArray: np.ndarray, Header: str = None):
         """
         Saves a numpy array as a .csv file.
@@ -163,6 +232,8 @@ class TrajectoryAnalysis:
         if qLength is None:
             qLength = self.RDF(Mode="COM")
 
+        SkipCalculation = False
+
         if Resolved:
             assert Diameter > 0.0, (
                 "System diameter must be provided for radially resolved results."
@@ -180,26 +251,30 @@ class TrajectoryAnalysis:
                 if self.OverwriteExisting:
                     BackupFile(OutputFile)
                 else:
-                    return
+                    SkipCalculation = True
 
-            Header = f"# q = {round(qLength, 3)} # Time / ps," + ",".join(
-                [
-                    f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
-                    for i in range(len(rBins) - 1)
-                ]
-            )
+            if not SkipCalculation:
 
-            t, Results = mde.correlation.shifted_correlation(
-                partial(mde.correlation.isf, q=qLength),
-                self.Coordinates,
-                selector=partial(TrajectoryAnalysis._MultiRadialSelector, rBins=rBins),
-                segments=self.nSegments,
-                skip=0.0,
-            )
+                Header = f"# q = {round(qLength, 3)} # Time / ps," + ",".join(
+                    [
+                        f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
+                        for i in range(len(rBins) - 1)
+                    ]
+                )
 
-            OutArray = t
-            for col in Results:
-                OutArray = np.column_stack([OutArray, col])
+                t, Results = mde.correlation.shifted_correlation(
+                    partial(mde.correlation.isf, q=qLength),
+                    self.Coordinates,
+                    selector=partial(TrajectoryAnalysis._MultiRadialSelector, rBins=rBins),
+                    segments=self.nSegments,
+                    skip=0.0,
+                )
+
+                OutArray = t
+                for col in Results:
+                    OutArray = np.column_stack([OutArray, col])
+
+                self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
         else:
             Filename = "ISF/ISF.csv"
@@ -209,19 +284,39 @@ class TrajectoryAnalysis:
                 if self.OverwriteExisting:
                     BackupFile(OutputFile)
                 else:
-                    return
+                    SkipCalculation = True
 
-            Header = f"# q = {round(qLength, 3)} # Time / ps, ISF"
-            t, Results = mde.correlation.shifted_correlation(
-                partial(mde.correlation.isf, q=qLength),
-                self.Coordinates,
-                segments=self.nSegments,
-                skip=0.0,
+            if not SkipCalculation:
+                Header = f"# q = {round(qLength, 3)} # Time / ps, ISF"
+                t, Results = mde.correlation.shifted_correlation(
+                    partial(mde.correlation.isf, q=qLength),
+                    self.Coordinates,
+                    segments=self.nSegments,
+                    skip=0.0,
+                )
+
+                OutArray = np.column_stack([t, Results])
+
+                self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        if self.PlottingMode != "Off":
+            PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+            if self.PlottingMode == "Initial" and os.path.exists(PlotName):
+                return
+
+            DataIn = pd.read_csv(OutputFile)
+
+            TrajectoryAnalysis._LinePlot(
+                PlotName,
+                DataIn.iloc[:, 0],
+                DataIn.iloc[:, 1:],
+                XAxisLabel=r"$t$ / ps",
+                XScale="log",
+                YAxisLabel=r"F(Q, t)",
+                UseHeaders=True,
+                PlotSize=(8,6),
             )
-
-            OutArray = np.column_stack([t, Results])
-
-        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
     def AveMSD(
         self,
@@ -242,6 +337,8 @@ class TrajectoryAnalysis:
         """
         Axes = [a.strip().lower() for a in Axes.split("and")]
 
+        SkipCalculation = False
+
         for Axis in Axes:
             if Resolved:
                 assert Diameter > 0.0, (
@@ -260,29 +357,34 @@ class TrajectoryAnalysis:
                     if self.OverwriteExisting:
                         BackupFile(OutputFile)
                     else:
-                        continue
+                        SkipCalculation = True
 
-                Header = "Time / ps," + ",".join(
-                    [
-                        f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
-                        for i in range(len(rBins) - 1)
-                    ]
-                )
+                if not SkipCalculation:
 
-                t, Results = mde.correlation.shifted_correlation(
-                    partial(mde.correlation.msd, axis=Axis),
-                    self.Coordinates,
-                    selector=partial(
-                        TrajectoryAnalysis._MultiRadialSelector, rBins=rBins
-                    ),
-                    segments=self.nSegments,
-                    skip=0.1,
-                    average=True,
-                )
+                    Header = "Time / ps," + ",".join(
+                        [
+                            f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
+                            for i in range(len(rBins) - 1)
+                        ]
+                    )
 
-                OutArray = t
-                for col in Results:
-                    OutArray = np.column_stack([OutArray, col])
+                    t, Results = mde.correlation.shifted_correlation(
+                        partial(mde.correlation.msd, axis=Axis),
+                        self.Coordinates,
+                        selector=partial(
+                            TrajectoryAnalysis._MultiRadialSelector, rBins=rBins
+                        ),
+                        segments=self.nSegments,
+                        skip=0.1,
+                        average=True,
+                    )
+
+                    OutArray = t
+                    for col in Results:
+                        OutArray = np.column_stack([OutArray, col])
+
+                    self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
             else:
                 Filename = f"MSD/MSD_{Axis}.csv"
                 OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -291,17 +393,42 @@ class TrajectoryAnalysis:
                     if self.OverwriteExisting:
                         BackupFile(OutputFile)
                     else:
-                        continue
+                        SkipCalculation = True
 
-                Header = "Time / ps, MSD"
-                t, Results = mde.correlation.shifted_correlation(
-                    partial(mde.correlation.msd, axis=Axis),
-                    self.Coordinates,
-                    segments=self.nSegments,
+                if not SkipCalculation:
+
+                    Header = "Time / ps, MSD"
+
+                    t, Results = mde.correlation.shifted_correlation(
+                        partial(mde.correlation.msd, axis=Axis),
+                        self.Coordinates,
+                        segments=self.nSegments,
+                    )
+
+                    OutArray = np.column_stack([t, Results])
+
+                    self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+            if self.PlottingMode != "Off":
+            
+                PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+                if self.PlottingMode == "Initial" and os.path.exists(PlotName):
+                    return
+
+                DataIn = pd.read_csv(OutputFile)
+
+                TrajectoryAnalysis._LinePlot(
+                    PlotName,
+                    DataIn.iloc[:, 0],
+                    DataIn.iloc[:, 1:],
+                    XAxisLabel=r"$\mathbf{\mathit{t}}$ / ps",
+                    XScale="log",
+                    YAxisLabel=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
+                    YScale="log",
+                    UseHeaders=True,
+                    PlotSize=(8,6),
                 )
-                OutArray = np.column_stack([t, Results])
-
-            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
 
     def Chi4Susceptibility(self, qLength: float = None):
         """

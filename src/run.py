@@ -81,6 +81,13 @@ def cli():
     is_flag=True,
     default=False,
 )
+@click.option(
+    "-pm",
+    "--plotmode",
+    "PlottingMode",
+    help="Whether to plot generated data. Options: 'Off' | 'Initial' | 'Overwrite existing'",
+    default="Initial"
+)
 def Pore(
     SimulationDirectory: str,
     Trajectory: str,
@@ -92,6 +99,7 @@ def Pore(
     qLength: float,
     OutputDirectory: str,
     Overwrite: bool,
+    PlottingMode: str,
 ):
     CoordFrameAnalysis = TrajectoryAnalysis(
         SimulationDirectory=SimulationDirectory,
@@ -102,6 +110,7 @@ def Pore(
         Atoms=Atoms,
         OutputDirectory=OutputDirectory,
         OverwriteExisting=Overwrite,
+        PlottingMode=PlottingMode,
     )
 
     CoordFrameAnalysis.AveMSD(
@@ -142,7 +151,6 @@ def Pore(
         nBins=150,
         Diameter=Diameter,
     )
-    CoordFrameAnalysis.HydrogenBonds()
 
 
 cli.add_command(Pore)
