@@ -85,8 +85,9 @@ def cli():
     "-pm",
     "--plotmode",
     "PlottingMode",
+    type=click.Choice(["Off", "Initial", "Overwrite existing"], case_sensitive=False),
+    default="Initial",
     help="Whether to plot generated data. Options: 'Off' | 'Initial' | 'Overwrite existing'",
-    default="Initial"
 )
 def Pore(
     SimulationDirectory: str,

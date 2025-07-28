@@ -45,7 +45,7 @@ class TrajectoryAnalysis:
 
         self.nSegments = nSegments
         self.OverwriteExisting = OverwriteExisting
-        self.PlottingMode = PlottingMode
+        self.PlottingMode = TrajectoryAnalysis._match_plotting_mode(PlottingMode)
 
         if OutputDirectory is None:
             self.OutputDirectory = os.path.join(
@@ -212,6 +212,35 @@ class TrajectoryAnalysis:
                 delimiter=",",
             )
 
+    def _match_plotting_mode(PlottingMode: str):
+        input = PlottingMode.lower().strip()
+        if input.startswith("off"):
+            return "Off"
+        elif input.startswith("init"):
+            return "Initial"
+        elif input.startswith("over"):
+            return "Overwrite existing"
+        else:
+            raise ValueError(
+                f"Unknown plotmode '{input}'. Use -pm / --plotmode 'Off', 'Initial', or 'Overwrite existing'."
+            )
+        
+    def _check_for_existing(self, file_pth: str) -> bool:
+        """
+        Check if a file is existing and determine whether to (re)generate it.
+
+        :param file_pth: Path to the queried file.
+        :return generate_file: Boolean 
+        """
+        generate_file = False
+        if os.path.exists(file_pth):
+            if self.OverwriteExisting:
+                BackupFile(file_pth)
+            else:
+                generate_file = True
+        
+        return generate_file
+
     def AveISF(
         self,
         qLength: float = None,
@@ -254,7 +283,6 @@ class TrajectoryAnalysis:
                     SkipCalculation = True
 
             if not SkipCalculation:
-
                 Header = f"# q = {round(qLength, 3)} # Time / ps," + ",".join(
                     [
                         f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
@@ -265,7 +293,9 @@ class TrajectoryAnalysis:
                 t, Results = mde.correlation.shifted_correlation(
                     partial(mde.correlation.isf, q=qLength),
                     self.Coordinates,
-                    selector=partial(TrajectoryAnalysis._MultiRadialSelector, rBins=rBins),
+                    selector=partial(
+                        TrajectoryAnalysis._MultiRadialSelector, rBins=rBins
+                    ),
                     segments=self.nSegments,
                     skip=0.0,
                 )
@@ -315,7 +345,7 @@ class TrajectoryAnalysis:
                 XScale="log",
                 YAxisLabel=r"F(Q, t)",
                 UseHeaders=True,
-                PlotSize=(8,6),
+                PlotSize=(8, 6),
             )
 
     def AveMSD(
@@ -360,7 +390,6 @@ class TrajectoryAnalysis:
                         SkipCalculation = True
 
                 if not SkipCalculation:
-
                     Header = "Time / ps," + ",".join(
                         [
                             f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
@@ -383,7 +412,9 @@ class TrajectoryAnalysis:
                     for col in Results:
                         OutArray = np.column_stack([OutArray, col])
 
-                    self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+                    self._SaveCSV(
+                        OutputFile=OutputFile, OutArray=OutArray, Header=Header
+                    )
 
             else:
                 Filename = f"MSD/MSD_{Axis}.csv"
@@ -396,7 +427,6 @@ class TrajectoryAnalysis:
                         SkipCalculation = True
 
                 if not SkipCalculation:
-
                     Header = "Time / ps, MSD"
 
                     t, Results = mde.correlation.shifted_correlation(
@@ -407,10 +437,11 @@ class TrajectoryAnalysis:
 
                     OutArray = np.column_stack([t, Results])
 
-                    self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+                    self._SaveCSV(
+                        OutputFile=OutputFile, OutArray=OutArray, Header=Header
+                    )
 
             if self.PlottingMode != "Off":
-            
                 PlotName = os.path.splitext(OutputFile)[0] + ".png"
 
                 if self.PlottingMode == "Initial" and os.path.exists(PlotName):
@@ -427,17 +458,17 @@ class TrajectoryAnalysis:
                     YAxisLabel=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
                     YScale="log",
                     UseHeaders=True,
-                    PlotSize=(8,6),
+                    PlotSize=(8, 6),
                 )
 
     def Chi4Susceptibility(self, qLength: float = None):
         """
-        Calculates fourth-order susceptibility based on provided coordinates.
+        Calculates fourth-order susceptibility.
 
         :param qLength: Length of the scattering vector, q.
         """
-        if qLength is None:
-            qLength = self.RDF()
+
+        SkipCalculation = False
 
         Filename = "Etc/Chi4.csv"
         OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -446,56 +477,94 @@ class TrajectoryAnalysis:
             if self.OverwriteExisting:
                 BackupFile(OutputFile)
             else:
+                SkipCalculation = True
+
+        if not SkipCalculation:
+            if qLength is None:
+                qLength = self.RDF()
+
+            Header = "t / ps, Chi4, Chi4 (Rolling Average)"
+
+            t, Results = mde.correlation.shifted_correlation(
+                partial(mde.correlation.isf, q=qLength),
+                self.Coordinates,
+                average=False,
+                segments=50,
+            )
+
+            RawResults = len(self.Coordinates[0]) * Results.var(axis=0) * 1e5
+            SmoothedResults = mde.utils.moving_average(RawResults, 5)
+
+            OutArray = np.column_stack([t[2:-2], RawResults[2:-2], SmoothedResults])
+
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        if self.PlottingMode != "Off":
+            PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+            if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                 return
 
-        Header = "t / ps, Chi4, Chi4 (Rolling Average)"
+            DataIn = pd.read_csv(OutputFile)
 
-        t, Results = mde.correlation.shifted_correlation(
-            partial(mde.correlation.isf, q=qLength),
-            self.Coordinates,
-            average=False,
-            segments=50,
-        )
-
-        RawResults = len(self.Coordinates[0]) * Results.var(axis=0) * 1e5
-        SmoothedResults = mde.utils.moving_average(RawResults, 5)
-
-        OutArray = np.column_stack([t[2:-2], RawResults[2:-2], SmoothedResults])
-
-        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+            TrajectoryAnalysis._LinePlot(
+                PlotName,
+                DataIn.iloc[:, 0],
+                DataIn.iloc[:, 1:],
+                XAxisLabel=r"$t$ / ps",
+                XScale="log",
+                YAxisLabel=r"$\chi_4 \cdot 10^{-5}$",
+                UseHeaders=True,
+                PlotSize=(8, 6),
+            )
 
     def nonGauss(self):
         """
-        Calculates non-Gaussian displacements based on centers of masses.
-
-        Args:
-            com: NumPy array containing the center of mass coordinates.
-            segments: Number of segments to divide the trajectory into.
-
-        Returns:
-            NDArray: NumPy array containing the non-Gaussian displacements and corresponding time series.
+        Calculates non-Gaussian displacements.
         """
+
+        SkipCalculation = False
 
         Filename = "Etc/nonGauss.csv"
         OutputFile = os.path.join(self.OutputDirectory, Filename)
-
-        Header = "Time / ps, Displacement"
 
         if os.path.exists(OutputFile):
             if self.OverwriteExisting:
                 BackupFile(OutputFile)
             else:
+                SkipCalculation = True
+
+        if not SkipCalculation:
+            Header = "Time / ps, Displacement"
+
+            t, Result = mde.correlation.shifted_correlation(
+                mde.correlation.non_gaussian_parameter,
+                self.Coordinates,
+                segments=self.nSegments,
+            )
+
+            OutArray = np.column_stack([t, Result])
+
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        if self.PlottingMode != "Off":
+            PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+            if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                 return
 
-        t, Result = mde.correlation.shifted_correlation(
-            mde.correlation.non_gaussian_parameter,
-            self.Coordinates,
-            segments=self.nSegments,
-        )
+            DataIn = pd.read_csv(OutputFile)
 
-        OutArray = np.column_stack([t, Result])
-
-        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+            TrajectoryAnalysis._LinePlot(
+                PlotName,
+                DataIn.iloc[:, 0],
+                DataIn.iloc[:, 1:],
+                XAxisLabel=r"$t$ / ps",
+                XScale="log",
+                YAxisLabel="Non-Gaussian Displacement",
+                UseHeaders=True,
+                PlotSize=(8, 6),
+            )
 
     def RadialDensity(
         self,
@@ -512,6 +581,9 @@ class TrajectoryAnalysis:
         :param nBins: Number of bins to divide the radius into.
         :param Buffer: Distance to buffer the radius beyond the diameter of system.
         """
+
+        SkipCalculation = False
+
         Filename = "RDF/Radial_Densities.csv"
         OutputFile = os.path.join(self.OutputDirectory, Filename)
 
@@ -519,41 +591,58 @@ class TrajectoryAnalysis:
             if self.OverwriteExisting:
                 BackupFile(OutputFile)
             else:
+                SkipCalculation = True
+
+        if not SkipCalculation:
+            assert Diameter > 0.0, (
+                "System diameter must be provided for radially resolved results."
+            )
+
+            Radius = Diameter / 2 + Buffer
+            rBins = np.arange(0.0, Radius + Radius / nBins, Radius / nBins)
+
+            r = 0.5 * (rBins[:-1] + rBins[1:])
+
+            Header = "r / nm," + ",".join(
+                [f"{Groups[i][1]}:{Groups[i][0]}" for i in range(len(Groups))]
+            )
+
+            Results = []
+            if Groups is not None:
+                for AtomName, ResName in Groups:
+                    Result = mde.distribution.time_average(
+                        partial(mde.distribution.radial_density, bins=rBins),
+                        self.InitCoordinates.subset(
+                            atom_name=AtomName, residue_name=ResName
+                        ),
+                        segments=self.nSegments,
+                        skip=0.01,
+                    )
+                    Results.append(Result)
+
+            OutArray = r
+            for Result in Results:
+                OutArray = np.column_stack([OutArray, Result])
+
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        if self.PlottingMode != "Off":
+            PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+            if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                 return
 
-        assert Diameter > 0.0, (
-            "System diameter must be provided for radially resolved results."
-        )
+            DataIn = pd.read_csv(OutputFile)
 
-        Radius = Diameter / 2 + Buffer
-        rBins = np.arange(0.0, Radius + Radius / nBins, Radius / nBins)
-
-        r = 0.5 * (rBins[:-1] + rBins[1:])
-
-        Header = "r / nm," + ",".join(
-            [f"{Groups[i][1]}:{Groups[i][0]}" for i in range(len(Groups))]
-        )
-
-        Results = []
-        if Groups is not None:
-            for AtomName, ResName in Groups:
-                Result = mde.distribution.time_average(
-                    partial(mde.distribution.radial_density, bins=rBins),
-                    self.InitCoordinates.subset(
-                        atom_name=AtomName, residue_name=ResName
-                    ),
-                    segments=self.nSegments,
-                    skip=0.01,
-                )
-                Results.append(Result)
-
-        OutArray = r
-        for Result in Results:
-            OutArray = np.column_stack([OutArray, Result])
-
-        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
-
-        return
+            TrajectoryAnalysis._LinePlot(
+                PlotName,
+                DataIn.iloc[:, 0],
+                DataIn.iloc[:, 1:],
+                XAxisLabel="r / nm",
+                YAxisLabel=r"Number Density / counts \cdot nm$^{-3}$",
+                UseHeaders=True,
+                PlotSize=(8, 6),
+            )
 
     def RDF(
         self, rMax: float = 2.5, ReturnQ: bool = True, Mode: str = "Total"
@@ -597,10 +686,31 @@ class TrajectoryAnalysis:
 
                 return qLength
 
+            if self.PlottingMode != "Off":
+                PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+                if self.PlottingMode == "Initial" and os.path.exists(PlotName):
+                    return
+
+                DataIn = pd.read_csv(OutputFile)
+
+                TrajectoryAnalysis._LinePlot(
+                    PlotName,
+                    DataIn.iloc[:, 0],
+                    DataIn.iloc[:, 1:],
+                    XAxisLabel="r / nm",
+                    YAxisLabel="g(r)",
+                    UseHeaders=True,
+                    PlotSize=(8, 6),
+                )
+
         else:
             assert len(self.Atoms) == 2, (
                 "Two atoms and their corresponding residue(s) must be specified when performing non-COM RDFS."
             )
+
+            SkipCalculation = False
+
             Filename = f"RDF/{Mode}_RDF.csv"
             OutputFile = os.path.join(self.OutputDirectory, Filename)
 
@@ -608,28 +718,47 @@ class TrajectoryAnalysis:
                 if self.OverwriteExisting:
                     BackupFile(OutputFile)
                 else:
+                    SkipCalculation = True
+
+            if not SkipCalculation:
+                Header = "r / nm, G(r)"
+
+                Atom1Coords = self.InitCoordinates.subset(
+                    atom_name=self.Atoms[0], residue_name=self.ResName
+                )
+
+                Atom2Coords = self.InitCoordinates.subset(
+                    atom_name=self.Atoms[1], residue_name=self.ResName
+                )
+
+                Bins = np.arange(0, rMax, 0.01)
+                Results = mde.distribution.time_average(
+                    function=partial(mde.distribution.rdf, bins=Bins, Mode=Mode),
+                    coordinates=Atom1Coords,
+                    coordinates_b=Atom2Coords,
+                    segments=self.nSegments,
+                )
+                OutArray = np.column_stack([Bins[:-1], Results])
+
+                self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+            if self.PlottingMode != "Off":
+                PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+                if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                     return
 
-            Header = "r / nm, G(r)"
+                DataIn = pd.read_csv(OutputFile)
 
-            Atom1Coords = self.InitCoordinates.subset(
-                atom_name=self.Atoms[0], residue_name=self.ResName
-            )
-
-            Atom2Coords = self.InitCoordinates.subset(
-                atom_name=self.Atoms[1], residue_name=self.ResName
-            )
-
-            Bins = np.arange(0, rMax, 0.01)
-            Results = mde.distribution.time_average(
-                function=partial(mde.distribution.rdf, bins=Bins, Mode=Mode),
-                coordinates=Atom1Coords,
-                coordinates_b=Atom2Coords,
-                segments=self.nSegments,
-            )
-            OutArray = np.column_stack([Bins[:-1], Results])
-
-            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+                TrajectoryAnalysis._LinePlot(
+                    PlotName,
+                    DataIn.iloc[:, 0],
+                    DataIn.iloc[:, 1:],
+                    XAxisLabel="r / nm",
+                    YAxisLabel="g(r)",
+                    UseHeaders=True,
+                    PlotSize=(8, 6),
+                )
 
     def vanHove(
         self,
@@ -643,19 +772,24 @@ class TrajectoryAnalysis:
         Calculates mean square displacement based on an averaged shifted correlation.
 
         :param Diameter: Diameter of the analyzed system.
+        :param Translational: Whether to perform translational van Hove analysis.
+        :param Rotational: Whether to perform rotational van Hove analysis.
         :param Resolved: Whether to provide radially binned results.
         :param nBins: Number of radial bins for radially resolved analysis.
         :param Buffer: Distance to buffer the radius beyond the diameter of system.
         """
+        if not Translational or Rotational:
+            raise ValueError(
+                "Please indicate whether to perform translational or rotational van Hove analysis."
+            )
+
         if Translational:
             assert Diameter > 0.0, (
                 "System diameter must be provided for radially resolved results."
             )
             assert nBins > 0, "Please specify a quantity of radial bins to use."
 
-            Radius = Diameter / 2 + Buffer
-
-            rBins = np.arange(0.0, Radius + Radius / nBins, Radius / nBins)
+            SkipCalculation = False
 
             Filename = f"Etc/TranslVanHove_{nBins}bins.csv"
             OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -664,27 +798,49 @@ class TrajectoryAnalysis:
                 if self.OverwriteExisting:
                     BackupFile(OutputFile)
                 else:
+                    SkipCalculation = True
+
+            if not SkipCalculation:
+                Radius = Diameter / 2 + Buffer
+
+                rBins = np.arange(0.0, Radius + Radius / nBins, Radius / nBins)
+
+                Time, Results = mde.correlation.shifted_correlation(
+                    partial(mde.correlation.van_hove_self, bins=rBins),
+                    self.Coordinates,
+                    segments=self.nSegments,
+                    skip=0.1,
+                )
+
+                Header = "r / nm," + ",".join([f"{t:.2f} ps" for t in Time])
+
+                r_bincenters = np.array(
+                    [0.5 * (rBins[i] + rBins[i + 1]) for i in range(len(rBins) - 1)]
+                )
+
+                OutArray = np.column_stack([r_bincenters, Results.T])
+
+                self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+            if self.PlottingMode != "Off":
+                PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+                if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                     return
 
-            Header = "Time / ps," + ",".join(
-                [
-                    f"{rBins[i]:.2f} to {rBins[i + 1]:.2f} nm"
-                    for i in range(len(rBins) - 1)
-                ]
-            )
+                DataIn = pd.read_csv(OutputFile)
 
-            t, Results = mde.correlation.shifted_correlation(
-                partial(mde.correlation.van_hove_self, bins=rBins),
-                self.Coordinates,
-                segments=self.nSegments,
-                skip=0.1,
-            )
+                TrajectoryAnalysis._LinePlot(
+                    PlotName,
+                    DataIn.iloc[:, 0],
+                    DataIn.iloc[:, 1:],
+                    XAxisLabel="r / nm",
+                    YAxisLabel="F(r, t)",
+                    UseHeaders=True,
+                    PlotSize=(8, 6),
+                )
 
-            OutArray = t
-            for col in Results.T:
-                OutArray = np.column_stack([OutArray, col])
-
-        elif Rotational:
+        if Rotational:
 
             def _vanHoveAngleDist(start, end, aBins):
                 ScalarProduct = (start * end).sum(axis=-1)
@@ -693,8 +849,7 @@ class TrajectoryAnalysis:
                 Histogram, _ = np.histogram(Angle * 360 / (2 * np.pi), aBins)
                 return 1 / len(start) * Histogram
 
-            aBins = np.linspace(0, 180, 361)
-            x = aBins[1:] - (aBins[1] - aBins[0]) / 2
+            SkipCalculation = False
 
             Filename = "Etc/RotVanHove.csv"
             OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -703,38 +858,50 @@ class TrajectoryAnalysis:
                 if self.OverwriteExisting:
                     BackupFile(OutputFile)
                 else:
+                    SkipCalculation = True
+
+            if not SkipCalculation:
+                aBins = np.linspace(0, 180, 361)
+
+                Time, Result = mde.correlation.shifted_correlation(
+                    function=partial(_vanHoveAngleDist, aBins=aBins),
+                    frames=self.Vectors,
+                    segments=self.nSegments,
+                )
+
+                Header = "Angle / degrees," + ",".join([f"{t:.2f}" for t in Time])
+
+                a_bincenters = np.array(
+                    [0.5 * (aBins[i] + aBins[i + 1]) for i in range(len(aBins) - 1)]
+                )
+
+                OutArray = np.column_stack([a_bincenters, Result.T])
+
+                self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+            if self.PlottingMode != "Off":
+                PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+                if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                     return
 
-            x = aBins[1:] - (aBins[1] - aBins[0]) / 2
+                DataIn = pd.read_csv(OutputFile)
 
-            Time, Result = mde.correlation.shifted_correlation(
-                function=partial(_vanHoveAngleDist, aBins=aBins),
-                frames=self.Vectors,
-                segments=self.nSegments,
-            )
-            t = np.array([t_i for t_i in Time for entry in x])
-            Angle = np.array([entry for t_i in Time for entry in x])
-
-            OutArray = np.column_stack([t, Angle, Result.flatten()])
-
-            Header = "t / ps, Angle / degrees, Result"
-
-        else:
-            raise ValueError(
-                "Please designate either translational or rotational for van Hove analysis."
-            )
-
-        try:
-            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
-        except UnboundLocalError:
-            raise UnboundLocalError(
-                "Please designate a type of van Hove function to analyze (translational or rotational)."
-            )
+                TrajectoryAnalysis._LinePlot(
+                    PlotName,
+                    DataIn.iloc[:, 0],
+                    DataIn.iloc[:, 1:],
+                    XAxisLabel=r"$\varphi$",
+                    YAxisLabel=r"F($\varphi$, t)",
+                    UseHeaders=True,
+                    PlotSize=(8, 6),
+                )
 
     def zAxisAlignment(self):
         """
         Calculates residual vectors' alignment with Z axis.
         """
+        SkipCalculation = False
 
         Filename = "Etc/zAxis_Alignment.csv"
         OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -743,37 +910,59 @@ class TrajectoryAnalysis:
             if self.OverwriteExisting:
                 BackupFile(OutputFile)
             else:
+                SkipCalculation = True
+
+        if not SkipCalculation:
+            Header = "t / ps, Angle / degrees, Result"
+
+            zVector = [0, 0, 1]
+            aBins = np.linspace(0, 180, 361)
+
+            def _Angles(start, end, zVector, aBins):
+                Angle = np.arccos((start * zVector).sum(axis=-1))
+                Angle = Angle[(Angle >= 0) * (Angle <= np.pi)]
+                Histogram, _ = np.histogram(Angle * 360 / (2 * np.pi), aBins)
+                return 1 / len(start) * Histogram
+
+            Time, Result = mde.correlation.shifted_correlation(
+                partial(_Angles, zVector=zVector, aBins=aBins),
+                self.Vectors,
+                segments=self.nSegments,
+            )
+
+            Header = "Angle / degrees," + ",".join([f"{t:.2f}" for t in Time])
+
+            a_bincenters = np.array(
+                [0.5 * (aBins[i] + aBins[i + 1]) for i in range(len(aBins) - 1)]
+            )
+
+            OutArray = np.column_stack([a_bincenters, Result.T])
+
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        if self.PlottingMode != "Off":
+            PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+            if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                 return
 
-        Header = "t / ps, Angle / degrees, Result"
+            DataIn = pd.read_csv(OutputFile)
 
-        zVector = [0, 0, 1]
-        aBins = np.linspace(0, 180, 361)
-        x = aBins[1:] - (aBins[1] - aBins[0]) / 2
-
-        def _Angles(start, end, zVector, aBins):
-            Angle = np.arccos((start * zVector).sum(axis=-1))
-            Angle = Angle[(Angle >= 0) * (Angle <= np.pi)]
-            Histogram, _ = np.histogram(Angle * 360 / (2 * np.pi), aBins)
-            return 1 / len(start) * Histogram
-
-        Time, Result = mde.correlation.shifted_correlation(
-            partial(_Angles, zVector=zVector, aBins=aBins),
-            self.Vectors,
-            segments=self.nSegments,
-        )
-
-        t = np.array([t_i for t_i in Time for entry in x])
-        Angle = np.array([entry for t_i in Time for entry in x])
-
-        OutArray = np.column_stack([t, Angle, Result.flatten()])
-
-        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+            TrajectoryAnalysis._LinePlot(
+                PlotName,
+                DataIn.iloc[:, 0],
+                DataIn.iloc[:, 1:],
+                XAxisLabel=r"$\varphi$",
+                YAxisLabel=r"S($\varphi$, t)",
+                UseHeaders=True,
+                PlotSize=(8, 6),
+            )
 
     def zAxisRadialPos(self):
         """
         Calculates Z-axis radial positions.
         """
+        SkipCalculation = False
 
         Filename = "Etc/zAxis_Radial_Positions.csv"
         OutputFile = os.path.join(self.OutputDirectory, Filename)
@@ -782,26 +971,45 @@ class TrajectoryAnalysis:
             if self.OverwriteExisting:
                 BackupFile(OutputFile)
             else:
+                SkipCalculation = True
+
+        if not SkipCalculation:
+            rBins = np.linspace(-1, 1, 201)
+
+            def z_comp(start, end, rBins):
+                VectorsLengths = np.linalg.norm(start, axis=1)
+                zComponent = start[:, 2] / VectorsLengths
+                Histogram, _ = np.histogram(zComponent, rBins)
+                return 1 / len(start) * Histogram
+
+            Time, Result = mde.correlation.shifted_correlation(
+                partial(z_comp, rBins=rBins), self.Vectors, segments=self.nSegments
+            )
+
+            Header = "r / nm," + ",".join([f"{t:.2f}" for t in Time])
+
+            r_bincenters = np.array(
+                [0.5 * (rBins[i] + rBins[i + 1]) for i in range(len(rBins) - 1)]
+            )
+
+            OutArray = np.column_stack([r_bincenters, Result.T])
+
+            self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+
+        if self.PlottingMode != "Off":
+            PlotName = os.path.splitext(OutputFile)[0] + ".png"
+
+            if self.PlottingMode == "Initial" and os.path.exists(PlotName):
                 return
 
-        Header = "t / ps, Angle / degrees, Result"
+            DataIn = pd.read_csv(OutputFile)
 
-        rBins = np.linspace(-1, 1, 201)
-        x = rBins[1:] - (rBins[1] - rBins[0]) / 2
-
-        def z_comp(start, end, rBins):
-            VectorsLengths = np.linalg.norm(start, axis=1)
-            zComponent = start[:, 2] / VectorsLengths
-            Histogram, _ = np.histogram(zComponent, rBins)
-            return 1 / len(start) * Histogram
-
-        Time, Result = mde.correlation.shifted_correlation(
-            partial(z_comp, rBins=rBins), self.Vectors, segments=self.nSegments
-        )
-
-        t = np.array([t_i for t_i in Time for entry in x])
-        Angle = np.array([entry for t_i in Time for entry in x])
-
-        OutArray = np.column_stack([t, Angle, Result.flatten()])
-
-        self._SaveCSV(OutputFile=OutputFile, OutArray=OutArray, Header=Header)
+            TrajectoryAnalysis._LinePlot(
+                PlotName,
+                DataIn.iloc[:, 0],
+                DataIn.iloc[:, 1:],
+                XAxisLabel=r"r / nm",
+                YAxisLabel="S(r, t)",
+                UseHeaders=True,
+                PlotSize=(8, 6),
+            )
