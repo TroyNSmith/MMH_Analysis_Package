@@ -1,6 +1,6 @@
 import click
 
-from analysis.CoordinateFrame import TrajectoryAnalysis
+from mde.trajectory import MDEvaluate
 
 
 @click.group()
@@ -102,7 +102,7 @@ def Pore(
     Overwrite: bool,
     PlottingMode: str,
 ):
-    CoordFrameAnalysis = TrajectoryAnalysis(
+    CoordFrameAnalysis = MDEvaluate(
         SimulationDirectory=SimulationDirectory,
         Trajectory=Trajectory,
         Topology=Topology,
@@ -133,9 +133,9 @@ def Pore(
     )  # Radially binned ISF (10 bins)
     CoordFrameAnalysis.nonGauss()  # Non-Gaussian Displacement Statistics
     CoordFrameAnalysis.vanHove(
-        Translational=True, Diameter=Diameter, nBins=15
+        Translational=True, Diameter=Diameter, nBins=1000
     )  # Translational van Hove dynamics
-    CoordFrameAnalysis.vanHove(Rotational=True)  # Rotational van Hove dynamics
+    CoordFrameAnalysis.vanHove(Rotational=True, nBins=1000)  # Rotational van Hove dynamics
     CoordFrameAnalysis.Chi4Susceptibility()
     CoordFrameAnalysis.zAxisAlignment()
     CoordFrameAnalysis.zAxisRadialPos()
