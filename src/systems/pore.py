@@ -2,7 +2,7 @@ import click
 
 from pathlib import Path
 
-from mde.core import Analyze
+from mde.core import MDEvaluateAnalysis
 
 
 @click.group()
@@ -95,7 +95,7 @@ def Run(
     output_dir: Path,
     override: bool,
 ):
-    analyzer = Analyze(sim_dir, topology, trajectory)
+    analyzer = MDEvaluateAnalysis(sim_dir, topology, trajectory)
     analyzer.assign_centers_of_masses(res_name)
 
     isf_analysis = analyzer.get_analysis(
