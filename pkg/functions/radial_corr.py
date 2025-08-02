@@ -1,7 +1,7 @@
-import mdevaluate as mde
 import numpy as np
 import matplotlib.pyplot as plt
-import helpers
+
+from .. import mdevaluate as mde
 
 testDir ="/media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system"
 rOuter = 1.2

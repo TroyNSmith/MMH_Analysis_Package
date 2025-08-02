@@ -1,16 +1,17 @@
 import click
-import matplotlib.pyplot as plt
 import MDAnalysis as mda
-import mdevaluate as mde
+import numpy as np
 import os
 import pandas as pd
 
-from functools import reduce
+from . import mdevaluate as mde
+from openpyxl import Workbook
 from pathlib import Path
 
 from .functions import dynamics
 from .functions.coordinates import centers_of_masses, vectorize_residue
 from .functions.plotting import plot_line
+from .functions import new_structural as structural
 from .functions.utils import log_analysis_yaml
 
 
@@ -26,6 +27,13 @@ def cli():
     "--input",
     "sim_dir",
     help="Path to simulation directory containing trajectory and topology files. This directory will also be used to dump output files unless otherwise specified.",
+)
+@click.option(
+    "-o",
+    "--output",
+    "out_dir",
+    help="Path to dump output files from analysis.",
+    default=None,
 )
 @click.option(
     "-tr",
@@ -73,16 +81,9 @@ def cli():
 @click.option(
     "-q",
     "--q",
-    "q_magnitude",
+    "q_val",
     type=float,
     help="Magnitude of the scattering vector, q.",
-    default=None,
-)
-@click.option(
-    "-o",
-    "--out",
-    "output_dir",
-    help="Designated path for analysis output files.",
     default=None,
 )
 @click.option(
@@ -101,282 +102,656 @@ def cli():
 )
 def Run(
     sim_dir: Path,
+    out_dir: Path,
     trajectory: str,
     topology: str,
     res_name: str,
     atoms: list[str],
     num_segments: int,
     pore_diameter: float,
-    q_magnitude: float,
+    q_val: float,
     override: bool,
     plot_only: bool,
 ):
+    # ==============================
     # ===== Step 1: Initialize =====
+    # ==============================
     mde_coords = mde.open(
         directory=sim_dir, topology=topology, trajectory=trajectory, nojump=True
     )
     mde_vectors = vectorize_residue(
-        mde_coords == mde_coords, residue=res_name, atoms=atoms
+        mde_coords=mde_coords, res_name=res_name, atoms=atoms
     )
-    mde_com = centers_of_masses(mde_coords=mde_coords, residue=res_name)
+    mde_com = centers_of_masses(mde_coords=mde_coords, res_name=res_name)
+
+    mde_atom_1_coords = mde_coords.subset(atom_name=atoms[0], residue_name=res_name)
+
+    mde_atom_2_coords = mde_coords.subset(atom_name=atoms[1], residue_name=res_name)
 
     mda_coords = mda.Universe(
         os.path.join(sim_dir, topology), os.path.join(sim_dir, trajectory)
     )
 
-    parameters={
+    dir_out = (
+        os.path.join(out_dir, "Analysis", f"{res_name}_{atoms[0]}_ {atoms[1]}")
+        if out_dir is not None
+        else os.path.join(sim_dir, "Analysis", f"{res_name}_{atoms[0]}_{atoms[1]}")
+    )
+
+    yaml_out = Path(os.path.join(dir_out, "log.yaml"))
+    xlsx_out = Path(os.path.join(dir_out, "results.xlsx"))
+
+    if not xlsx_out.exists():
+        wb = Workbook()
+        wb.save(xlsx_out)
+
+    imported_params = {
         "trajectory": trajectory,
         "topology": topology,
         "res_name": res_name,
         "atoms": atoms,
         "num_segments": num_segments,
         "pore_diameter": pore_diameter,
-        "q_magnitude": q_magnitude,
+        "q_magnitude": q_val,
     }
 
-    dir_out = os.path.join(sim_dir, "analysis")
+    # =================================================
+    # ===== Step 2: Radial distribution functions =====
+    # =================================================
+    os.makedirs(os.path.join(dir_out, "RDF"), exist_ok=True)
 
-    yaml_out = os.path.join(dir_out, "log.yaml")
-
-    # ===== Step 2: Mean square displacement =====
-    csv_out_all = os.path.join(dir_out, "MSD", "MSD_all.csv")
-    csv_out_z = os.path.join(dir_out, "MSD", "MSD_z.csv")
-    csv_out_xy = os.path.join(dir_out, "MSD", "MSD_xy.csv")
-    png_out = os.path.join(dir_out, "MSD", "MSD.png")
-
-    if not os.path.exists(csv_out_all) or override:
-        msd_all = dynamics.mean_square_displacement(
-            coords=mde_com, num_segments=num_segments
+    # ===== Total (centers of masses)
+    csv_out_total = os.path.join(dir_out, "RDF", "RDF_total.csv")
+    if not os.path.exists(csv_out_total) or override:
+        print("Calculating total centers of masses RDF...")
+        rdf_total = structural.radial_distribution_function(
+            coords_1=mde_com,
+            num_segments=num_segments,
+            column_label="Centers of Masses",
         )
-        msd_all.to_csv(csv_out_all)
-        log_analysis_yaml(log_path=yaml_out,
-                          analysis_name='MSD (z-axis)',
-                          parameters=parameters)
-
-    if not os.path.exists(csv_out_z) or override:
-        msd_z = dynamics.mean_square_displacement(
-            coords=mde_com, axis="z", num_segments=num_segments
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Centers of Masses RDF (total)",
+            file_path=csv_out_total,
+            parameters=imported_params,
         )
-        msd_z.to_csv(csv_out_z)
+        rdf_total.to_csv(csv_out_total, index=False)
 
-    if not os.path.exists(csv_out_xy) or override:
-        msd_xy = dynamics.mean_square_displacement(
-            coords=mde_com, axis="xy", num_segments=num_segments
+    # ===== Magnitude of q vector
+    if q_val is None:
+        rdf_total = pd.read_csv(csv_out_total)
+        y_max_idx = rdf_total.iloc[:, 1].idxmax()
+        x_at_max_y = rdf_total.iloc[y_max_idx, 0]
+        q_val = float(round(2 * np.pi / x_at_max_y, 3))
+        imported_params["q_magnitude"] = q_val
+
+    # ===== Intramolecular
+    csv_out_intra = os.path.join(dir_out, "RDF", "RDF_intra.csv")
+    if not os.path.exists(csv_out_total) or override:
+        print("Calculating intramolecular RDF...")
+        rdf_intra = structural.radial_distribution_function(
+            coords_1=mde_atom_1_coords,
+            coords_2=mde_atom_2_coords,
+            num_segments=num_segments,
+            mode="intra",
+            column_label=f"Intra {atoms[0]}:{atoms[1]}",
         )
-        msd_xy.to_csv(csv_out_xy)
-
-    if not os.path.exists(png_out) or plot_only:
-        msd_all = pd.read_csv(csv_out_all)
-        msd_z = pd.read_csv(csv_out_z)
-        msd_xy = pd.read_csv(csv_out_xy)
-
-        msd_merged = reduce(
-            lambda left, right: pd.merge(left, right, on="time / ps"),
-            [msd_all, msd_z, msd_xy],
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Intra RDF",
+            file_path=csv_out_intra,
+            parameters=imported_params,
         )
+        rdf_intra.to_csv(csv_out_intra, index=False)
+
+    # ===== Intermolecular (atom 1)
+    csv_out_inter_1 = os.path.join(dir_out, "RDF", f"RDF_inter_{atoms[0]}.csv")
+    if not os.path.exists(csv_out_total) or override:
+        print("Calculating intermolecular RDF #1...")
+        rdf_inter_1 = structural.radial_distribution_function(
+            coords_1=mde_atom_1_coords,
+            coords_2=mde_atom_1_coords,
+            num_segments=num_segments,
+            mode="inter",
+            column_label=f"Inter {atoms[0]}:{atoms[0]}",
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name=f"Inter RDF ({atoms[0]})",
+            file_path=csv_out_inter_1,
+            parameters=imported_params,
+        )
+        rdf_inter_1.to_csv(csv_out_inter_1, index=False)
+
+    # ===== Intermolecular (atom 2)
+    csv_out_inter_2 = os.path.join(dir_out, "RDF", f"RDF_inter_{atoms[1]}.csv")
+    if not os.path.exists(csv_out_total) or override:
+        print("Calculating intermolecular RDF #2...")
+        rdf_inter_2 = structural.radial_distribution_function(
+            coords_1=mde_atom_2_coords,
+            coords_2=mde_atom_2_coords,
+            num_segments=num_segments,
+            mode="inter",
+            column_label=f"Inter {atoms[1]}:{atoms[1]}",
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name=f"Inter RDF ({atoms[1]})",
+            file_path=csv_out_inter_2,
+            parameters=imported_params,
+        )
+        rdf_inter_2.to_csv(csv_out_inter_2, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "RDF", "RDF.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            rdf_total = pd.read_csv(csv_out_total)
+            rdf_intra = pd.read_csv(csv_out_intra)
+            rdf_inter_1 = pd.read_csv(csv_out_inter_1)
+            rdf_inter_2 = pd.read_csv(csv_out_inter_2)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        msd_merged = pd.concat(
+            [
+                rdf_total,
+                rdf_intra.iloc[:, 1],
+                rdf_inter_1.iloc[:, 1],
+                rdf_inter_2.iloc[:, 1],
+            ],
+            axis=1,
+        )
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            msd_merged.to_excel(writer, sheet_name="RDF", index=False)
 
         plot_line(
             output_path=png_out,
-            x_data=msd_merged[:, 0],
-            y_data=msd_merged[:, 1:],
+            x_data=msd_merged.iloc[:, 0],
+            y_data=msd_merged.iloc[:, 1:],
+            x_axis_label="r / nm",
+            y_axis_label="g(r)",
+        )
+
+    # ============================================
+    # ===== Step 3: Mean square displacement =====
+    # ============================================
+    os.makedirs(os.path.join(dir_out, "MSD"), exist_ok=True)
+
+    # ===== Residual MSD (all directions)
+    csv_out_all = os.path.join(dir_out, "MSD", "MSD_all.csv")
+    if not os.path.exists(csv_out_all) or override:
+        print("Calculating total MSD...")
+        msd_all = dynamics.mean_square_displacement(
+            coords=mde_com, num_segments=num_segments
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="MSD (all)",
+            file_path=csv_out_all,
+            parameters=imported_params,
+        )
+        msd_all.to_csv(csv_out_all, index=False)
+
+    # ===== Residual MSD (z-axis)
+    csv_out_z = os.path.join(dir_out, "MSD", "MSD_z.csv")
+    if not os.path.exists(csv_out_z) or override:
+        print("Calculating z-axis MSD...")
+        msd_z = dynamics.mean_square_displacement(
+            coords=mde_com, axis="z", num_segments=num_segments
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="MSD (z-axis)",
+            file_path=csv_out_z,
+            parameters=imported_params,
+        )
+        msd_z.to_csv(csv_out_z, index=False)
+
+    # ===== Residual MSD (xy-plane)
+    csv_out_xy = os.path.join(dir_out, "MSD", "MSD_xy.csv")
+    if not os.path.exists(csv_out_xy) or override:
+        print("Calculating xy-plane MSD...")
+        msd_xy = dynamics.mean_square_displacement(
+            coords=mde_com, axis="xy", num_segments=num_segments
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="MSD (xy-plane)",
+            file_path=csv_out_xy,
+            parameters=imported_params,
+        )
+        msd_xy.to_csv(csv_out_xy, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "MSD", "MSD.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            msd_all = pd.read_csv(csv_out_all)
+            msd_z = pd.read_csv(csv_out_z)
+            msd_xy = pd.read_csv(csv_out_xy)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        msd_merged = pd.concat([msd_all, msd_z.iloc[:, 1], msd_xy.iloc[:, 1]], axis=1)
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            msd_merged.to_excel(writer, sheet_name="MSD", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=msd_merged.iloc[:, 0],
+            y_data=msd_merged.iloc[:, 1:],
             x_axis_scale="log",
             x_axis_label=r"$\mathbf{\mathit{t}}$ / ps",
             y_axis_scale="log",
             y_axis_label=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
         )
 
+    # ==============================================================
+    # ===== Step 4: Radially resolved mean square displacement =====
+    # ==============================================================
+    csv_out_resolved = os.path.join(dir_out, "MSD", "MSD_resolved.csv")
+    if not os.path.exists(csv_out_resolved) or override:
+        print("Calculating radially resolved MSD...")
+        msd_resolved = dynamics.mean_square_displacement(
+            coords=mde_com,
+            num_segments=num_segments,
+            radially_resolved=True,
+            pore_diameter=pore_diameter,
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="MSD (radially resolved)",
+            file_path=csv_out_resolved,
+            parameters=imported_params,
+        )
+        msd_resolved.to_csv(csv_out_resolved, index=False)
 
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "MSD", "MSD_resolved.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            msd_resolved = pd.read_csv(csv_out_resolved)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            msd_resolved.to_excel(writer, sheet_name="MSD Resolved", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=msd_resolved.iloc[:, 0],
+            y_data=msd_resolved.iloc[:, 1:],
+            x_axis_scale="log",
+            x_axis_label=r"$\mathbf{\mathit{t}}$ / ps",
+            y_axis_scale="log",
+            y_axis_label=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
+        )
+
+    # ==================================================
+    # ===== Step 5: Incoherent scattering function =====
+    # ==================================================
+    os.makedirs(os.path.join(dir_out, "ISF"), exist_ok=True)
+
+    # ===== Residual ISF
+    csv_out_isf = os.path.join(dir_out, "ISF", "ISF.csv")
+    if not os.path.exists(csv_out_isf) or override:
+        print("Calculating ISF...")
+        isf_total = dynamics.incoherent_scattering_function(
+            coords=mde_com,
+            q_val=q_val,
+            num_segments=num_segments,
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="ISF (total)",
+            file_path=csv_out_isf,
+            parameters=imported_params,
+        )
+        isf_total.to_csv(csv_out_isf, index=False)
+
+    # ===== Residual ISF (resolved)
+    csv_out_isf_resolved = os.path.join(dir_out, "ISF", "ISF_resolved.csv")
+    if not os.path.exists(csv_out_isf_resolved) or override:
+        print("Calculating resolved ISF...")
+        isf_resolved = dynamics.incoherent_scattering_function(
+            coords=mde_com,
+            q_val=q_val,
+            num_segments=num_segments,
+            radially_resolved=True,
+            pore_diameter=pore_diameter,
+            num_bins=5,
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="ISF (resolved)",
+            file_path=csv_out_isf_resolved,
+            parameters=imported_params,
+        )
+        isf_resolved.to_csv(csv_out_isf_resolved, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "ISF", "ISF.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            isf_total = pd.read_csv(csv_out_isf)
+            isf_resolved = pd.read_csv(csv_out_isf_resolved)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        isf_merged = pd.concat([isf_total, isf_resolved.iloc[:, 1:]], axis=1)
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            isf_merged.to_excel(writer, sheet_name="ISF", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=isf_merged.iloc[:, 0],
+            y_data=isf_merged.iloc[:, 1:],
+            x_axis_scale="log",
+            x_axis_label="t / ps",
+            y_axis_scale="log",
+            y_axis_label=f"ISF(q={q_val:.1f}, t)",
+        )
+
+    # ==================================================
+    # ===== Step 6: Rotational correlation coeffs. =====
+    # ==================================================
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
+
+    # ===== Residual ISF
+    csv_out_rotat_correl = os.path.join(dir_out, "Etc", "Rotational_correlation_coeffs.csv")
+    if not os.path.exists(csv_out_rotat_correl) or override:
+        print("Calculating rotational correlation coefficients...")
+        rotat_correl = dynamics.rotational_correlations(
+            vectors = mde_vectors,
+            num_segments=num_segments
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Rotational correlation coefficients",
+            file_path=csv_out_rotat_correl,
+            parameters=imported_params,
+        )
+        rotat_correl.to_csv(csv_out_rotat_correl, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Rotational_correlation_coeffs.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            rotat_correl = pd.read_csv(csv_out_rotat_correl)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            rotat_correl.to_excel(writer, sheet_name="Rotational correlation coefficients", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=rotat_correl.iloc[:, 0],
+            y_data=rotat_correl.iloc[:, 1:],
+            x_axis_label="t / ps",
+            x_axis_scale="log",
+            y_axis_label=r"$F_n(t)$",
+        )
+
+    # ========================================================
+    # ===== Step 7: Rotational van Hove Self-Correlation =====
+    # ========================================================
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
+
+    # ===== Rotational van Hove
+    csv_out_rotat_van_Hove = os.path.join(dir_out, "Etc", "Rotational_van_Hove.csv")
+    if not os.path.exists(csv_out_rotat_van_Hove) or override:
+        print("Calculating rotational van Hove self-correlation...")
+        rotat_van_Hove = dynamics.van_hove_rotation(
+            vectors = mde_vectors,
+            num_segments=num_segments
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Rotational van Hove",
+            file_path=csv_out_rotat_van_Hove,
+            parameters=imported_params,
+        )
+        rotat_van_Hove.to_csv(csv_out_rotat_van_Hove, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Rotational_van_Hove.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            rotat_van_Hove = pd.read_csv(csv_out_rotat_van_Hove)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            rotat_van_Hove.to_excel(writer, sheet_name="Rotational van Hove", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=rotat_van_Hove.iloc[:, 0],
+            y_data=rotat_van_Hove.iloc[:, 2:],
+            x_axis_label="θ / degrees",
+            y_axis_label="F(θ, t)",
+        )
+
+    # ===========================================================
+    # ===== Step 7: Translational van Hove Self-Correlation =====
+    # ===========================================================
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
+
+    # ===== Translational van Hove
+    csv_out_trans_van_Hove = os.path.join(dir_out, "Etc", "Translational_van_Hove.csv")
+    if not os.path.exists(csv_out_trans_van_Hove) or override:
+        print("Calculating translational van Hove self-correlation...")
+        trans_van_Hove = dynamics.van_hove_translation(
+            coords=mde_com,
+            num_segments=num_segments,
+            pore_diameter=pore_diameter,
+            num_bins=250
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Translational van Hove",
+            file_path=csv_out_trans_van_Hove,
+            parameters=imported_params,
+        )
+        trans_van_Hove.to_csv(csv_out_trans_van_Hove, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Translational_van_Hove.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            trans_van_Hove = pd.read_csv(csv_out_trans_van_Hove)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            trans_van_Hove.to_excel(writer, sheet_name="Translational van Hove", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=trans_van_Hove.iloc[:, 0],
+            y_data=trans_van_Hove.iloc[:, 2:],
+            x_axis_label="r / nm",
+            y_axis_label="F(r, t)",
+        )
+
+    # ==========================================
+    # ===== Step 7: Non-Gaussian Parameter =====
+    # ==========================================
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
+
+    # ===== Translational van Hove
+    csv_out_non_gauss = os.path.join(dir_out, "Etc", "non_Gaussian_parameter.csv")
+    if not os.path.exists(csv_out_non_gauss) or override:
+        print("Calculating non-Gaussian parameters...")
+        non_gauss_param = dynamics.non_gaussian_parameter(
+            coords=mde_com,
+            num_segments=num_segments,
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Non-Gaussian parameter",
+            file_path=csv_out_non_gauss,
+            parameters=imported_params,
+        )
+        non_gauss_param.to_csv(csv_out_non_gauss, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "non_Gaussian_parameter.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            non_gauss_param = pd.read_csv(csv_out_non_gauss)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            non_gauss_param.to_excel(writer, sheet_name="Non-Gaussian Parameter", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=non_gauss_param.iloc[:, 0],
+            y_data=non_gauss_param.iloc[:, 1:],
+            x_axis_label="t / ns",
+            x_axis_scale='log',
+            y_axis_label="NGP(t)",
+        )
+
+    # ==========================================
+    # ===== Step 7: Chi-4 Susceptibility =====
+    # ==========================================
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
+
+    # ===== Chi-4 Susceptibility
+    csv_out_chi_4 = os.path.join(dir_out, "Etc", "Chi_4_susceptibility.csv")
+    if not os.path.exists(csv_out_chi_4) or override:
+        print("Calculating chi-4 susceptibility...")
+        chi_4 = dynamics.chi_4_susceptibility(
+            coords=mde_com,
+            q_val=q_val,
+            num_segments=num_segments,
+        )
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Chi-4 susceptibility",
+            file_path=csv_out_chi_4,
+            parameters=imported_params,
+        )
+        chi_4.to_csv(csv_out_chi_4, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Chi_4_susceptibility.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            chi_4 = pd.read_csv(csv_out_chi_4)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            chi_4.to_excel(writer, sheet_name="Chi-4 Susceptibility", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=chi_4.iloc[:, 0],
+            y_data=chi_4.iloc[:, 1:],
+            x_axis_label="t / ns",
+            x_axis_scale='log',
+            y_axis_label=fr"$χ_4(q={q_val:.1f}, t)$",
+        )
+
+    # ============================================
+    # ===== Step 8: Spatial density function =====
+    # ============================================
+    os.makedirs(os.path.join(dir_out, "RDF"), exist_ok=True)
+
+    # ===== Spatial density function
+    csv_out_sdf = os.path.join(dir_out, "RDF", "Spatial_density.csv")
+    if not os.path.exists(csv_out_sdf) or override:
+        print("Calculating spatial density functions...")
+
+        res_atom_pairs = {
+            res_name: atoms,
+            "LNK": ["NL"],
+            "ETH": ["OEE"],
+            "VAN": ["NV", "OVE", "OVH"],
+        }
+
+        sdf = structural.spatial_density_function(
+            coords=mde_coords,
+            res_atom_pairs=res_atom_pairs,
+            pore_diameter=pore_diameter
+        )
+        imported_params["res_atom_pairs"] = res_atom_pairs
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Spatial density function",
+            file_path=csv_out_sdf,
+            parameters=imported_params,
+        )
+        del imported_params["res_atom_pairs"]
+        sdf.to_csv(csv_out_sdf, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "RDF", "Spatial_density.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            sdf = pd.read_csv(csv_out_sdf)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            sdf.to_excel(writer, sheet_name="Spatial density function", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=sdf.iloc[:, 0],
+            y_data=sdf.iloc[:, 1:],
+            x_axis_label="r / nm",
+            y_axis_label=r"Number density / Units $\cdot$ nm$^3$",
+        )
+
+    # ========================================
+    # ===== Step 8: Hydrogen bond counts =====
+    # ========================================
+    os.makedirs(os.path.join(dir_out, "RDF"), exist_ok=True)
+
+    # ===== Spatial density function
+    csv_out_sdf = os.path.join(dir_out, "RDF", "Spatial_density.csv")
+    if not os.path.exists(csv_out_sdf) or override:
 """
-# ===== Step 3: Calculate the resolved mean square displacement =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/MSD/Resolved_MSD_{residue}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Resolved MSD")
-            msd, r = dynamics.resolved_msd(com=com, diameter=pore_inf['D'], segments=segments)
-            plotting.plot_line(f'{workdir}/analysis/graphs/MSD/Resolved_MSD_{residue}.png', msd[:,0], msd[:,1:], xlabel=r"$\mathbf{\mathit{t}}$ / ps", ylabel=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
-                               xscale='log', yscale='log', legend=True, handles=[f'{bin:.2f}' for bin in r], ncols=2)
-            np.savetxt(f'{workdir}/analysis/data_files/MSD/Resolved_MSD_{residue}.csv', msd, delimiter=',', header='Time / ps,'.join([f'{bin:.2f},' for bin in r]))
-        pbar.update(1)
-
-# ===== Step 4: Calculate the RDF / q constant =====
-        if q_val == 0 or overwrite:
-            pbar.set_postfix(step="Calculating RDF")
-            rdf, q_val, g_max = structural.rdf_com(com=com, segments=1000)
-            helpers.log_info(workdir, f'Value for q constant: {q_val}', f'Value for g max: {g_max}')
-            plotting.plot_line(f'{workdir}/analysis/graphs/RDF/RDF_com_{residue}_{atom1}_{atom2}.png', rdf[:,0], rdf[:,1], xlabel='r / nm', ylabel='g(r)')
-            np.savetxt(f'{workdir}/analysis/data_files/RDF/RDF_com_{residue}_{atom1}_{atom2}.csv', rdf, delimiter=',', header='r / nm, g(r)')
-        pbar.update(1)
-
-# ===== Step 5: Calculate the incoherent scattering function =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/ISF/ISF_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating ISF")
-            isf = dynamics.incoherent_scattering_function(coords=com, q_val=q_val, num_segments=segments, pore_diameter=pore_inf['D']/2)
-            plotting.plot_line(f'{workdir}/analysis/graphs/ISF/ISF_{residue}_{atom1}_{atom2}.png', isf[:,0], isf[:,1:], xlabel=r"$t$ / ps", ylabel="ISF", xscale='log', legend=True, handles=['All', 'Wall', 'Center'])
-            np.savetxt(f'{workdir}/analysis/data_files/ISF/ISF_{residue}_{atom1}_{atom2}.csv', isf, delimiter=',', header='Time / ps, All, Wall, Center')
-        pbar.update(1)
-
-# ===== Step 6: Calculate the resolved incoherent scattering function =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/ISF/Resolved_ISF_{residue}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Resolved ISF")
-            isf, r = dynamics.resolved_isf(com=com, q_val=q_val, diameter=pore_inf['D'], segments=segments)
-            plotting.plot_line(f'{workdir}/analysis/graphs/ISF/Resolved_ISF_{residue}.png', isf[:,0], isf[:,1:], xlabel=r"$t$ / ps", ylabel="ISF", xscale='log',
-                               legend=True, handles=[f'{bin:.2f}' for bin in r], ncols=2)
-            np.savetxt(f'{workdir}/analysis/data_files/ISF/Resolved_ISF_{residue}.csv', isf, delimiter=',', header='Time / ps,'.join([f'{bin:.2f},' for bin in r]))
-        pbar.update(1)
-
-# ===== Step 7: Calculate rotational correlation coefficients =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Rotation/Rotational_Corr_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Rotational Correlation")
-            rot_corr = dynamics.rotational_corr(vectors=mde_vectors, num_segments=segments)
-            plotting.plot_line(f'{workdir}/analysis/graphs/Rotation/Rotational_Corr_{residue}_{atom1}_{atom2}.png', rot_corr[:,0], rot_corr[:,1:], xlabel=r"$t$ / ps",
-                               ylabel="F(t)", xscale='log', legend=True, handles=[r'$F_1(t)$', r'$F_2(t)$'], ncols=1)
-            np.savetxt(f'{workdir}/analysis/data_files/Rotation/Rotational_Corr_{residue}_{atom1}_{atom2}.csv', rot_corr, delimiter=',', header='Time / ps, F1, F2')
-        pbar.update(1)
-
-# ===== Step 8: Calculate the non-Gaussian displacement statistics =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/nonGauss/nonGauss_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Non-Gaussian Displacement")
-            non_gauss = dynamics.non_Gauss(com=com, segments=segments)
-            plotting.plot_line(f'{workdir}/analysis/graphs/nonGauss/nonGauss_{residue}_{atom1}_{atom2}.png', non_gauss[:,0], non_gauss[:,1:],
-                               xlabel=r"$t$ / ps", ylabel="Non-Gaussian Displacement", xscale='log')
-            np.savetxt(f'{workdir}/analysis/data_files/nonGauss/nonGauss_{residue}_{atom1}_{atom2}.csv', non_gauss, delimiter=',', header='Time / ps, Displacement')
-        pbar.update(1)
-
-# ===== Step 9: Calculate the translational van Hove correlations =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/vanHove/vanHove_transl_center_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Translational van Hove")
-            plt.style.use('MPL_Styles/3D_Plot.mplstyle')            # Use custom styling
-            vH_wall, vH_center, bins = dynamics.van_hove_translation(coords=com, pore_diameter=pore_inf['D'], num_segments=segments, pore=True)
-            complete_matrix = np.column_stack([bins, vH_wall.T])
-
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-
-            for i in range(2, complete_matrix.shape[1]):
-                bins = complete_matrix[1:, 0]
-                vH_all = complete_matrix[1:, i]
-                t = complete_matrix[0, i]
-                times = np.full_like(bins, t)
-
-                ax.plot(bins, times, vH_all, alpha=0.8)
-
-            ax.set_xlabel("r / nm")
-            ax.set_ylabel("t / ps")
-            ax.set_zlabel("S(r, t)", labelpad=10)
-            ax.grid(False)
-            ax.view_init(elev=30, azim=120)
-
-            plt.savefig(f'{workdir}/analysis/graphs/vanHove/vanHove_transl_wall_{residue}_{atom1}_{atom2}.png')
-            np.savetxt(f'{workdir}/analysis/data_files/vanHove/vanHove_transl_wall_{residue}_{atom1}_{atom2}.csv', vH_wall, delimiter=',')
-            plt.clf()
-
-            complete_matrix = np.column_stack([np.insert(bins,0,0), vH_center.T])
-
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='3d')
-
-            for i in range(2, complete_matrix.shape[1]):
-                bins = complete_matrix[1:, 0]
-                vH_all = complete_matrix[1:, i]
-                t = complete_matrix[0, i]
-                times = np.full_like(bins, t)
-
-                ax.plot(bins, times, vH_all, alpha=0.8)
-
-            ax.set_xlabel("r / nm")
-            ax.set_ylabel("t / ps")
-            ax.set_zlabel("S(r, t)", labelpad=10)
-            ax.grid(False)
-            ax.view_init(elev=30, azim=120)
-
-            plt.savefig(f'{workdir}/analysis/graphs/vanHove/vanHove_transl_center_{residue}_{atom1}_{atom2}.png')
-            np.savetxt(f'{workdir}/analysis/data_files/vanHove/vanHove_transl_center_{residue}_{atom1}_{atom2}.csv', vH_wall, delimiter=',')
-            plt.clf()
-            plt.style.use('MPL_Styles/ForPapers.mplstyle')      # Go back to normal styling
-
-        pbar.update(1)
-
-# ===== Step 10: Calculate the rotational van Hove correlations =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/vanHove/vanHove_rot_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Rotational van Hove")
-            vH_rot =  dynamics.van_hove_rotation(vectors=mde_vectors, num_segments=segments)
-            plotting.plot_scatter(f'{workdir}/analysis/graphs/vanHove/vanHove_rot_{residue}_{atom1}_{atom2}.png', vH_rot[vH_rot[:,0] == 0, 1], 
-                                  np.column_stack([vH_rot[vH_rot[:,0] == t, 2] for t in np.unique(vH_rot[:,0])[5::10]]),
-                                  xlabel=r'$\varphi$', ylabel=r'$S(\varphi)$', legend=True,
-                                  handles=[f'{t} ps' for t in np.unique(vH_rot[:,0])[5::10]], ncols=1)
-            np.savetxt(f'{workdir}/analysis/data_files/vanHove/vanHove_rot_{residue}_{atom1}_{atom2}.csv', vH_rot, delimiter=',')
-        pbar.update(1)
-
-# ===== Step 11: Calculate the fourth-order susceptibility =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Susceptibility/Susceptibility_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating 4th Order Susceptibility")
-            sus = dynamics.chi_4_susceptibility(coords=com, q_val=q_val)
-            plotting.plot_line(f'{workdir}/analysis/graphs/Susceptibility/Susceptibility_{residue}_{atom1}_{atom2}.png', sus[:,0], sus[:,1:], xlabel=r"$t$ / ps", 
-                               ylabel=r'$\chi_4 \cdot 10^{-5}$', xscale='log', legend=True, handles=[r'$\chi_4$', r'$\chi_4$ Smoothed'])
-            np.savetxt(f'{workdir}/analysis/data_files/Susceptibility/Susceptibility_{residue}.csv', sus, delimiter=',', header='Time / ps, Displacement')
-        pbar.update(1)
-        
-# ===== Step 12: Calculate the Z-axis radial alignments =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Z_Axis/Z_align_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Z-Axis Alignment")
-            Z_align =  structural.z_align(vectors=mde_vectors, segments=segments)
-            plotting.plot_scatter(f'{workdir}/analysis/graphs/Z_Axis/Z_align_{residue}_{atom1}_{atom2}.png', Z_align[Z_align[:,0] == 0, 1], 
-                                  np.column_stack([Z_align[Z_align[:,0] == t, 2] for t in np.unique(Z_align[:,0])[::20]]),
-                                  xlabel=r'$\varphi$', ylabel=r'$S(\varphi)$', legend=True,
-                                  handles=[f'{t} ps' for t in np.unique(Z_align[:,0])[::20]], ncols=1)
-            np.savetxt(f'{workdir}/analysis/data_files/Z_Axis/Z_align_{residue}_{atom1}_{atom2}.csv', Z_align, delimiter=',', header=r'Time / ps, $\varphi$, S($\varphi$)')
-        pbar.update(1)
-        
-# ===== Step 13: Calculate the Z-axis radial positions =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Z_Axis/Z_histogram_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Z-Axis Radial Positions")
-            Z_histo =  structural.z_histogram(vectors=mde_vectors, segments=segments)
-            plotting.plot_scatter(f'{workdir}/analysis/graphs/Z_Axis/Z_histogram_{residue}_{atom1}_{atom2}.png',  Z_histo[Z_histo[:,0] == 0, 1], 
-                                  np.column_stack([Z_histo[Z_histo[:,0] == t, 2] for t in np.unique(Z_histo[:,0])[::20]]),
-                                  xlabel=r'$\varphi$', ylabel=r'$S(\varphi)$', legend=True,
-                                  handles=[f'{t} ps' for t in np.unique(Z_histo[:,0])[::20]], ncols=1)
-            np.savetxt(f'{workdir}/analysis/data_files/Z_Axis/Z_histogram_{residue}_{atom1}_{atom2}.csv', Z_histo, delimiter=',', header=r'Time / ps, $\varphi$, dist($\varphi$)')
-        pbar.update(1)
-        
-# ===== Step 14: Calculate the intramolecular atom-wise RDF =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/RDF/RDF_Intra_{residue}_{atom1}_to_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Intra Atom-Wise RDFs")
-            rdf_intra = structural.rdf_intra(mdaUniverse=mda_universe, residue=residue, atom1=atom1, atom2=atom2) 
-            plotting.plot_line(f'{workdir}/analysis/graphs/RDF/RDF_Intra_{residue}_{atom1}_to_{atom2}.png', rdf_intra[:,0], rdf_intra[:,1], xlabel='r / nm', ylabel=r'$g_{intra}(r)$')
-            np.savetxt(f'{workdir}/analysis/data_files/RDF/RDF_Intra_{residue}_{atom1}_to_{atom2}.csv', rdf_intra, delimiter=',', header='Distance / nm, Mean RDF')          
-        pbar.update(1)
-        
-# ===== Step 15: Calculate the intermolecular atom-wise RDF =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/RDF/RDF_Inter_{residue}_{atom1}_to_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Inter Atom-Wise RDFs")
-            rdf_inter = structural.rdf_inter(mdaUniverse=mda_universe, residue=residue, atom1=atom1, atom2=atom2) 
-            plotting.plot_line(f'{workdir}/analysis/graphs/RDF/RDF_Inter_{residue}_{atom1}_to_{atom2}.png', rdf_inter[:,0], rdf_inter[:,1:], xlabel='r / nm', ylabel=r'$g_{inter}(r)$', legend=True,
-                               handles=[f'{residue}:{atom1} to {residue}:{atom1}',
-                                        f'{residue}:{atom1} to {residue}:{atom2}',
-                                        f'{residue}:{atom2} to {residue}:{atom2}'])
-            np.savetxt(f'{workdir}/analysis/data_files/RDF/RDF_Intra_{residue}_{atom1}_to_{atom2}.csv', rdf_inter, delimiter=',', header='Distance / nm, Mean RDF')               
-        pbar.update(1)
-        
-# ===== Step 16: Calculate the radial spatial density function(s) =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Spatial_Density/Spatial_Density_{residue}_{atom1}_{atom2}.png') or overwrite:
-            pbar.set_postfix(step="Calculating Radial Spatial Density Function")
-
-            results = []
-            residues = [residue, residue, 'LNK', 'ETH', 'VAN', 'VAN', 'VAN']
-            names = [atom1, atom2, 'NL', 'OEE', 'NV', 'OVE', 'OVH']
-
-            with tqdm(total=len(residues), desc="Spatial Density Progress", unit="Pair") as bar:
-                for res, atom in zip(residues, names):
-                    if res in [f'{residue.resname}' for residue in mda_universe.residues]:
-                        rSDF = structural.radial_density(mde_trajectory=mde_trajectory, residue=res, atom=atom, diameter=pore_inf['D'])
-                        results.append(rSDF[:,1])
-                    bar.update(1)
-
-            results = [rSDF[:,0]] + results
-            rSDF = np.column_stack(results)
-            plotting.plot_line(f'{workdir}/analysis/graphs/Spatial_Density/Spatial_Density_{residue}_{atom1}_{atom2}.png', rSDF[:,0], rSDF[:,1:],
-                               xlabel="r / nm", ylabel=r"Number Density / nm$^{-3}$", legend=True,
-                               handles=[f'{res}:{atom}' for res, atom in zip(residues, names)])
-            np.savetxt(f'{workdir}/analysis/data_files/Spatial_Density/Spatial_Density_{residue}_{atom1}_{atom2}.csv', rSDF, delimiter=',', header='r / nm, ' + ''.join([f'{res}:{atom}, ' for res, atom in zip(residues, names)])) 
-        pbar.update(1)
 
 # ===== Step 17: Initialize the hydrogen bond information =====
         if not os.path.exists(f'{workdir}/analysis/data_files/HBonds/All_HBonds_NEW.csv') or overwrite:

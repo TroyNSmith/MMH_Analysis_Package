@@ -1,11 +1,9 @@
-# Imports #
-# ------- #
 import pexpect
 from functools import partial
 from matplotlib.colors import LogNorm
 import matplotlib.pyplot as plt
 from MDAnalysis.analysis.rdf import InterRDF
-import mdevaluate as mde
+from .. import mdevaluate as mde
 import numpy as np
 from numpy.typing import NDArray
 import os
@@ -14,7 +12,7 @@ import subprocess
 import pkg.functions.plotting_backup as plotting_backup
 from tqdm import tqdm
 from typing import Any
-# ------- #
+
 
 try:
     plt.style.use("MPL_Styles/ForPapers.mplstyle")

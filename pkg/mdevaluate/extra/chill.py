@@ -7,8 +7,8 @@ from scipy import sparse
 from scipy.spatial import KDTree
 from scipy.special import sph_harm
 
-from mdevaluate.coordinates import CoordinateFrame, Coordinates
-from mdevaluate.pbc import pbc_points
+from ..coordinates import CoordinateFrame, Coordinates
+from ..pbc import pbc_points
 
 
 def calc_aij(atoms: ArrayLike, N: int = 4, l: int = 3) -> tuple[NDArray, NDArray]:

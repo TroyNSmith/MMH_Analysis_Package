@@ -1,6 +1,6 @@
 import numpy as np
 
-from pkg import mdevaluate as mde
+from .. import mdevaluate as mde
 
 
 def centers_of_masses(

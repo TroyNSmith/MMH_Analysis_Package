@@ -3,13 +3,14 @@ import yaml
 from datetime import datetime
 from pathlib import Path
 
-def log_analysis_yaml(log_path: Path, analysis_name: str, parameters: dict):
-    """Logs metadata for each analysis step into a YAML file.
+def log_analysis_yaml(log_path: Path, analysis_name: str, file_path: str, parameters: dict):
+    """
+    Logs the result of an analysis to a YAML file, overwriting previous entries with the same file path.
 
-    Args:
-        log_path (Path): Path to the YAML log file.
-        analysis_name (str): Name of the analysis (e.g., 'msd_all').
-        parameters (dict): Parameters used in the run.
+    :param log_path: Path to the YAML log file.
+    :param analysis_name: Name of the analysis (e.g., 'msd_all').
+    :param file_path: Path to the analysis output file.
+    :param parameters: Parameters used in the run.
     """
     log_data = {}
 
@@ -20,10 +21,19 @@ def log_analysis_yaml(log_path: Path, analysis_name: str, parameters: dict):
     if analysis_name not in log_data:
         log_data[analysis_name] = []
 
+    # Remove any existing entries with the same file path
+    log_data[analysis_name] = [
+        entry for entry in log_data[analysis_name]
+        if entry.get("Saved to") != str(file_path)
+    ]
+
+    # Add new (latest) entry
     log_data[analysis_name].append({
-        "Last analyzed": datetime.now().isoformat(),
+        "Last analyzed": datetime.now(),
+        "Saved to": str(file_path),
         "Parameters": parameters,
     })
 
+    # Save updated log
     with open(log_path, "w") as f:
         yaml.safe_dump(log_data, f, sort_keys=False)

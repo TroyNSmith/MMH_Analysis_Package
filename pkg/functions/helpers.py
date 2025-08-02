@@ -1,20 +1,13 @@
-# Imports #
-# ------- #
-from collections import defaultdict
-import logging
-import mdevaluate as mde
 import numpy as np
-from numpy.typing import NDArray
-from typing import Any, Iterable
-import warnings
-# ------- #
 
-# Suppress specific warnings:
-warnings.filterwarnings("ignore", category=RuntimeWarning, module="numpy")
+from collections import defaultdict
+from typing import Any
+
+from .. import mdevaluate as mde
 
 def center_of_masses(trajectory: Any, 
                      residue: str
-                     )-> NDArray:
+                     )-> np.ndarray:
 
     @mde.coordinates.map_coordinates
     def center_of_masses(coordinates, atoms, shear: bool = False):
@@ -31,11 +24,11 @@ def center_of_masses(trajectory: Any,
         return np.array(positions)
     return center_of_masses(trajectory, atoms=trajectory.subset(residue_name=residue).atom_subset.indices).nojump
 
-def exponential_model(t: NDArray,
+def exponential_model(t: np.ndarray,
                       A: float,
                       k: float, 
                       C: float
-                      )-> NDArray:
+                      )-> np.ndarray:
     """
     Returns the model associated with a set of exponential fit variables.
 
@@ -46,12 +39,12 @@ def exponential_model(t: NDArray,
         C: Exponential fit translation.
 
     Returns:
-        NDArray: NumPy array containing the fitted y data series.
+        np.ndarray: NumPy array containing the fitted y data series.
     """
     return A * np.exp(t * k) + C
 
-def fit_exp_linear(t: NDArray, 
-                   y: NDArray, 
+def fit_exp_linear(t: np.ndarray, 
+                   y: np.ndarray, 
                    C: int = 0, 
                    order: int = 1,
                    max_attempts: int = 100,
@@ -125,7 +118,7 @@ def log_info(workdir: str,
                 f.write(str(arg) + '\n')
 
 def multi_radial_selector(atoms, 
-                          bins: NDArray
+                          bins: np.ndarray
                           )-> list:
     """
     Selects all of the atoms within a radial bin.

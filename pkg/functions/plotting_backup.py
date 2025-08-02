@@ -1,9 +1,9 @@
-# Imports #
-# ------- #
 import matplotlib.pyplot as plt
+
 from numpy.typing import NDArray
 from typing import Any
-# ------- #
+
+
 try:
     plt.style.use('MPL_Styles/ForPapers.mplstyle')
 except FileNotFoundError:
