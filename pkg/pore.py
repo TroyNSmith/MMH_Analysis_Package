@@ -1,5 +1,6 @@
 import click
 import MDAnalysis as mda
+import mdtraj as mdt
 import numpy as np
 import os
 import pandas as pd
@@ -8,11 +9,11 @@ from . import mdevaluate as mde
 from openpyxl import Workbook
 from pathlib import Path
 
-from .functions import dynamics
-from .functions.coordinates import centers_of_masses, vectorize_residue
-from .functions.plotting import plot_line
-from .functions import new_structural as structural
-from .functions.utils import log_analysis_yaml
+from .functions import mdevaluate_analysis, mdtraj_analysis
+from .utils.coordinates import centers_of_masses, vectorize_residue
+from .utils.plotting import plot_heatmap, plot_line
+from .functions import mdanalysis_analysis as hbonds
+from .utils.logging import log_analysis_yaml
 
 
 @click.group()
@@ -46,6 +47,12 @@ def cli():
     "--topology",
     "topology",
     help="Name of the topology file located within -d / --directory.",
+)
+@click.option(
+    "-st",
+    "--structure",
+    "structure",
+    help="Name of the structure (i.e. .gro) file located within -d / --directory.",
 )
 @click.option(
     "-r",
@@ -105,6 +112,7 @@ def Run(
     out_dir: Path,
     trajectory: str,
     topology: str,
+    structure: str,
     res_name: str,
     atoms: list[str],
     num_segments: int,
@@ -132,20 +140,28 @@ def Run(
         os.path.join(sim_dir, topology), os.path.join(sim_dir, trajectory)
     )
 
+    mdt_coords = mdt.load(
+        os.path.join(sim_dir, trajectory), top=os.path.join(sim_dir, structure)
+    )
+
+    mdt_resid_idxs = mdt_coords.topology.select(f"resname {res_name}")
+    mdt_resid_traj = mdt_coords.atom_slice(mdt_resid_idxs)
+
     dir_out = (
         os.path.join(out_dir, "Analysis", f"{res_name}_{atoms[0]}_ {atoms[1]}")
         if out_dir is not None
         else os.path.join(sim_dir, "Analysis", f"{res_name}_{atoms[0]}_{atoms[1]}")
     )
 
+    os.makedirs(dir_out, exist_ok=True)
+
     yaml_out = Path(os.path.join(dir_out, "log.yaml"))
-    xlsx_out = Path(os.path.join(dir_out, "results.xlsx"))
+    xlsx_out = Path(
+        os.path.join(dir_out, f"results_{res_name}_{atoms[0]}_{atoms[1]}.xlsx")
+    )
 
-    if not xlsx_out.exists():
-        wb = Workbook()
-        wb.save(xlsx_out)
-
-    imported_params = {
+    params = {
+        "sim_directory": sim_dir,
         "trajectory": trajectory,
         "topology": topology,
         "res_name": res_name,
@@ -154,6 +170,20 @@ def Run(
         "pore_diameter": pore_diameter,
         "q_magnitude": q_val,
     }
+
+    if not os.path.exists(xlsx_out):
+        wb = Workbook()
+        ws = wb["Sheet"]
+        ws.title = "Parameters"
+        ws.cell(
+            row=1,
+            column=1,
+            value="Check summary.yaml for more accurate parameters as those listed here are for the initial analysis only (i.e., not necessarily for regenerated analyses.)",
+        )
+        for i, (param, value) in enumerate(params.items(), start=2):
+            ws.cell(row=i, column=1, value=param)
+            ws.cell(row=i, column=2, value=str(value))
+        wb.save(xlsx_out)
 
     # =================================================
     # ===== Step 2: Radial distribution functions =====
@@ -164,7 +194,7 @@ def Run(
     csv_out_total = os.path.join(dir_out, "RDF", "RDF_total.csv")
     if not os.path.exists(csv_out_total) or override:
         print("Calculating total centers of masses RDF...")
-        rdf_total = structural.radial_distribution_function(
+        rdf_total = mdevaluate_analysis.radial_distribution_function(
             coords_1=mde_com,
             num_segments=num_segments,
             column_label="Centers of Masses",
@@ -173,7 +203,7 @@ def Run(
             log_path=yaml_out,
             analysis_name="Centers of Masses RDF (total)",
             file_path=csv_out_total,
-            parameters=imported_params,
+            parameters=params,
         )
         rdf_total.to_csv(csv_out_total, index=False)
 
@@ -183,13 +213,13 @@ def Run(
         y_max_idx = rdf_total.iloc[:, 1].idxmax()
         x_at_max_y = rdf_total.iloc[y_max_idx, 0]
         q_val = float(round(2 * np.pi / x_at_max_y, 3))
-        imported_params["q_magnitude"] = q_val
+        params["q_magnitude"] = f"{q_val} (auto-generated)"
 
     # ===== Intramolecular
     csv_out_intra = os.path.join(dir_out, "RDF", "RDF_intra.csv")
-    if not os.path.exists(csv_out_total) or override:
+    if not os.path.exists(csv_out_intra) or override:
         print("Calculating intramolecular RDF...")
-        rdf_intra = structural.radial_distribution_function(
+        rdf_intra = mdevaluate_analysis.radial_distribution_function(
             coords_1=mde_atom_1_coords,
             coords_2=mde_atom_2_coords,
             num_segments=num_segments,
@@ -200,15 +230,15 @@ def Run(
             log_path=yaml_out,
             analysis_name="Intra RDF",
             file_path=csv_out_intra,
-            parameters=imported_params,
+            parameters=params,
         )
         rdf_intra.to_csv(csv_out_intra, index=False)
 
     # ===== Intermolecular (atom 1)
     csv_out_inter_1 = os.path.join(dir_out, "RDF", f"RDF_inter_{atoms[0]}.csv")
-    if not os.path.exists(csv_out_total) or override:
+    if not os.path.exists(csv_out_inter_1) or override:
         print("Calculating intermolecular RDF #1...")
-        rdf_inter_1 = structural.radial_distribution_function(
+        rdf_inter_1 = mdevaluate_analysis.radial_distribution_function(
             coords_1=mde_atom_1_coords,
             coords_2=mde_atom_1_coords,
             num_segments=num_segments,
@@ -219,15 +249,15 @@ def Run(
             log_path=yaml_out,
             analysis_name=f"Inter RDF ({atoms[0]})",
             file_path=csv_out_inter_1,
-            parameters=imported_params,
+            parameters=params,
         )
         rdf_inter_1.to_csv(csv_out_inter_1, index=False)
 
     # ===== Intermolecular (atom 2)
     csv_out_inter_2 = os.path.join(dir_out, "RDF", f"RDF_inter_{atoms[1]}.csv")
-    if not os.path.exists(csv_out_total) or override:
+    if not os.path.exists(csv_out_inter_2) or override:
         print("Calculating intermolecular RDF #2...")
-        rdf_inter_2 = structural.radial_distribution_function(
+        rdf_inter_2 = mdevaluate_analysis.radial_distribution_function(
             coords_1=mde_atom_2_coords,
             coords_2=mde_atom_2_coords,
             num_segments=num_segments,
@@ -238,7 +268,7 @@ def Run(
             log_path=yaml_out,
             analysis_name=f"Inter RDF ({atoms[1]})",
             file_path=csv_out_inter_2,
-            parameters=imported_params,
+            parameters=params,
         )
         rdf_inter_2.to_csv(csv_out_inter_2, index=False)
 
@@ -286,14 +316,14 @@ def Run(
     csv_out_all = os.path.join(dir_out, "MSD", "MSD_all.csv")
     if not os.path.exists(csv_out_all) or override:
         print("Calculating total MSD...")
-        msd_all = dynamics.mean_square_displacement(
+        msd_all = mdevaluate_analysis.mean_square_displacement(
             coords=mde_com, num_segments=num_segments
         )
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="MSD (all)",
             file_path=csv_out_all,
-            parameters=imported_params,
+            parameters=params,
         )
         msd_all.to_csv(csv_out_all, index=False)
 
@@ -301,14 +331,14 @@ def Run(
     csv_out_z = os.path.join(dir_out, "MSD", "MSD_z.csv")
     if not os.path.exists(csv_out_z) or override:
         print("Calculating z-axis MSD...")
-        msd_z = dynamics.mean_square_displacement(
+        msd_z = mdevaluate_analysis.mean_square_displacement(
             coords=mde_com, axis="z", num_segments=num_segments
         )
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="MSD (z-axis)",
             file_path=csv_out_z,
-            parameters=imported_params,
+            parameters=params,
         )
         msd_z.to_csv(csv_out_z, index=False)
 
@@ -316,14 +346,14 @@ def Run(
     csv_out_xy = os.path.join(dir_out, "MSD", "MSD_xy.csv")
     if not os.path.exists(csv_out_xy) or override:
         print("Calculating xy-plane MSD...")
-        msd_xy = dynamics.mean_square_displacement(
+        msd_xy = mdevaluate_analysis.mean_square_displacement(
             coords=mde_com, axis="xy", num_segments=num_segments
         )
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="MSD (xy-plane)",
             file_path=csv_out_xy,
-            parameters=imported_params,
+            parameters=params,
         )
         msd_xy.to_csv(csv_out_xy, index=False)
 
@@ -361,7 +391,7 @@ def Run(
     csv_out_resolved = os.path.join(dir_out, "MSD", "MSD_resolved.csv")
     if not os.path.exists(csv_out_resolved) or override:
         print("Calculating radially resolved MSD...")
-        msd_resolved = dynamics.mean_square_displacement(
+        msd_resolved = mdevaluate_analysis.mean_square_displacement(
             coords=mde_com,
             num_segments=num_segments,
             radially_resolved=True,
@@ -371,7 +401,7 @@ def Run(
             log_path=yaml_out,
             analysis_name="MSD (radially resolved)",
             file_path=csv_out_resolved,
-            parameters=imported_params,
+            parameters=params,
         )
         msd_resolved.to_csv(csv_out_resolved, index=False)
 
@@ -408,7 +438,7 @@ def Run(
     csv_out_isf = os.path.join(dir_out, "ISF", "ISF.csv")
     if not os.path.exists(csv_out_isf) or override:
         print("Calculating ISF...")
-        isf_total = dynamics.incoherent_scattering_function(
+        isf_total = mdevaluate_analysis.incoherent_scattering_function(
             coords=mde_com,
             q_val=q_val,
             num_segments=num_segments,
@@ -417,7 +447,7 @@ def Run(
             log_path=yaml_out,
             analysis_name="ISF (total)",
             file_path=csv_out_isf,
-            parameters=imported_params,
+            parameters=params,
         )
         isf_total.to_csv(csv_out_isf, index=False)
 
@@ -425,7 +455,7 @@ def Run(
     csv_out_isf_resolved = os.path.join(dir_out, "ISF", "ISF_resolved.csv")
     if not os.path.exists(csv_out_isf_resolved) or override:
         print("Calculating resolved ISF...")
-        isf_resolved = dynamics.incoherent_scattering_function(
+        isf_resolved = mdevaluate_analysis.incoherent_scattering_function(
             coords=mde_com,
             q_val=q_val,
             num_segments=num_segments,
@@ -437,7 +467,7 @@ def Run(
             log_path=yaml_out,
             analysis_name="ISF (resolved)",
             file_path=csv_out_isf_resolved,
-            parameters=imported_params,
+            parameters=params,
         )
         isf_resolved.to_csv(csv_out_isf_resolved, index=False)
 
@@ -474,18 +504,19 @@ def Run(
     os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
 
     # ===== Residual ISF
-    csv_out_rotat_correl = os.path.join(dir_out, "Etc", "Rotational_correlation_coeffs.csv")
+    csv_out_rotat_correl = os.path.join(
+        dir_out, "Etc", "Rotational_correlation_coeffs.csv"
+    )
     if not os.path.exists(csv_out_rotat_correl) or override:
         print("Calculating rotational correlation coefficients...")
-        rotat_correl = dynamics.rotational_correlations(
-            vectors = mde_vectors,
-            num_segments=num_segments
+        rotat_correl = mdevaluate_analysis.rotational_correlations(
+            vectors=mde_vectors, num_segments=num_segments
         )
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="Rotational correlation coefficients",
             file_path=csv_out_rotat_correl,
-            parameters=imported_params,
+            parameters=params,
         )
         rotat_correl.to_csv(csv_out_rotat_correl, index=False)
 
@@ -501,7 +532,9 @@ def Run(
         with pd.ExcelWriter(
             xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            rotat_correl.to_excel(writer, sheet_name="Rotational correlation coefficients", index=False)
+            rotat_correl.to_excel(
+                writer, sheet_name="Rotational correlation coefficients", index=False
+            )
 
         plot_line(
             output_path=png_out,
@@ -521,15 +554,14 @@ def Run(
     csv_out_rotat_van_Hove = os.path.join(dir_out, "Etc", "Rotational_van_Hove.csv")
     if not os.path.exists(csv_out_rotat_van_Hove) or override:
         print("Calculating rotational van Hove self-correlation...")
-        rotat_van_Hove = dynamics.van_hove_rotation(
-            vectors = mde_vectors,
-            num_segments=num_segments
+        rotat_van_Hove = mdevaluate_analysis.van_hove_rotation(
+            vectors=mde_vectors, num_segments=num_segments
         )
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="Rotational van Hove",
             file_path=csv_out_rotat_van_Hove,
-            parameters=imported_params,
+            parameters=params,
         )
         rotat_van_Hove.to_csv(csv_out_rotat_van_Hove, index=False)
 
@@ -545,7 +577,9 @@ def Run(
         with pd.ExcelWriter(
             xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            rotat_van_Hove.to_excel(writer, sheet_name="Rotational van Hove", index=False)
+            rotat_van_Hove.to_excel(
+                writer, sheet_name="Rotational van Hove", index=False
+            )
 
         plot_line(
             output_path=png_out,
@@ -556,7 +590,7 @@ def Run(
         )
 
     # ===========================================================
-    # ===== Step 7: Translational van Hove Self-Correlation =====
+    # ===== Step 8: Translational van Hove Self-Correlation =====
     # ===========================================================
     os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
 
@@ -564,17 +598,17 @@ def Run(
     csv_out_trans_van_Hove = os.path.join(dir_out, "Etc", "Translational_van_Hove.csv")
     if not os.path.exists(csv_out_trans_van_Hove) or override:
         print("Calculating translational van Hove self-correlation...")
-        trans_van_Hove = dynamics.van_hove_translation(
+        trans_van_Hove = mdevaluate_analysis.van_hove_translation(
             coords=mde_com,
             num_segments=num_segments,
             pore_diameter=pore_diameter,
-            num_bins=250
+            num_bins=250,
         )
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="Translational van Hove",
             file_path=csv_out_trans_van_Hove,
-            parameters=imported_params,
+            parameters=params,
         )
         trans_van_Hove.to_csv(csv_out_trans_van_Hove, index=False)
 
@@ -590,7 +624,9 @@ def Run(
         with pd.ExcelWriter(
             xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            trans_van_Hove.to_excel(writer, sheet_name="Translational van Hove", index=False)
+            trans_van_Hove.to_excel(
+                writer, sheet_name="Translational van Hove", index=False
+            )
 
         plot_line(
             output_path=png_out,
@@ -601,7 +637,7 @@ def Run(
         )
 
     # ==========================================
-    # ===== Step 7: Non-Gaussian Parameter =====
+    # ===== Step 9: Non-Gaussian Parameter =====
     # ==========================================
     os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
 
@@ -609,7 +645,7 @@ def Run(
     csv_out_non_gauss = os.path.join(dir_out, "Etc", "non_Gaussian_parameter.csv")
     if not os.path.exists(csv_out_non_gauss) or override:
         print("Calculating non-Gaussian parameters...")
-        non_gauss_param = dynamics.non_gaussian_parameter(
+        non_gauss_param = mdevaluate_analysis.non_gaussian_parameter(
             coords=mde_com,
             num_segments=num_segments,
         )
@@ -617,7 +653,7 @@ def Run(
             log_path=yaml_out,
             analysis_name="Non-Gaussian parameter",
             file_path=csv_out_non_gauss,
-            parameters=imported_params,
+            parameters=params,
         )
         non_gauss_param.to_csv(csv_out_non_gauss, index=False)
 
@@ -633,19 +669,21 @@ def Run(
         with pd.ExcelWriter(
             xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            non_gauss_param.to_excel(writer, sheet_name="Non-Gaussian Parameter", index=False)
+            non_gauss_param.to_excel(
+                writer, sheet_name="Non-Gaussian Parameter", index=False
+            )
 
         plot_line(
             output_path=png_out,
             x_data=non_gauss_param.iloc[:, 0],
             y_data=non_gauss_param.iloc[:, 1:],
             x_axis_label="t / ns",
-            x_axis_scale='log',
+            x_axis_scale="log",
             y_axis_label="NGP(t)",
         )
 
     # ==========================================
-    # ===== Step 7: Chi-4 Susceptibility =====
+    # ===== Step 10: Chi-4 Susceptibility ======
     # ==========================================
     os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
 
@@ -653,7 +691,7 @@ def Run(
     csv_out_chi_4 = os.path.join(dir_out, "Etc", "Chi_4_susceptibility.csv")
     if not os.path.exists(csv_out_chi_4) or override:
         print("Calculating chi-4 susceptibility...")
-        chi_4 = dynamics.chi_4_susceptibility(
+        chi_4 = mdevaluate_analysis.chi_4_susceptibility(
             coords=mde_com,
             q_val=q_val,
             num_segments=num_segments,
@@ -662,7 +700,7 @@ def Run(
             log_path=yaml_out,
             analysis_name="Chi-4 susceptibility",
             file_path=csv_out_chi_4,
-            parameters=imported_params,
+            parameters=params,
         )
         chi_4.to_csv(csv_out_chi_4, index=False)
 
@@ -685,13 +723,13 @@ def Run(
             x_data=chi_4.iloc[:, 0],
             y_data=chi_4.iloc[:, 1:],
             x_axis_label="t / ns",
-            x_axis_scale='log',
-            y_axis_label=fr"$χ_4(q={q_val:.1f}, t)$",
+            x_axis_scale="log",
+            y_axis_label=rf"$χ_4(q={q_val:.1f}, t)$",
         )
 
-    # ============================================
-    # ===== Step 8: Spatial density function =====
-    # ============================================
+    # =============================================
+    # ===== Step 11: Spatial density function =====
+    # =============================================
     os.makedirs(os.path.join(dir_out, "RDF"), exist_ok=True)
 
     # ===== Spatial density function
@@ -706,19 +744,19 @@ def Run(
             "VAN": ["NV", "OVE", "OVH"],
         }
 
-        sdf = structural.spatial_density_function(
+        sdf = mdevaluate_analysis.spatial_density_function(
             coords=mde_coords,
             res_atom_pairs=res_atom_pairs,
-            pore_diameter=pore_diameter
+            pore_diameter=pore_diameter,
         )
-        imported_params["res_atom_pairs"] = res_atom_pairs
+        params["res_atom_pairs"] = res_atom_pairs
         log_analysis_yaml(
             log_path=yaml_out,
             analysis_name="Spatial density function",
             file_path=csv_out_sdf,
-            parameters=imported_params,
+            parameters=params,
         )
-        del imported_params["res_atom_pairs"]
+        del params["res_atom_pairs"]
         sdf.to_csv(csv_out_sdf, index=False)
 
     # ===== Plot and save to .xlsx
@@ -743,178 +781,297 @@ def Run(
             y_axis_label=r"Number density / Units $\cdot$ nm$^3$",
         )
 
-    # ========================================
-    # ===== Step 8: Hydrogen bond counts =====
-    # ========================================
-    os.makedirs(os.path.join(dir_out, "RDF"), exist_ok=True)
+    # ==================================================
+    # ===== Step 12: Z-axis and xy-plane alignment =====
+    # ==================================================
+    """
+    For best results, utilize (small) vectorized molecular segments (e.g. OCT H00: O01) rather than whole vectorized residues (e.g. OCT O01: C0O)
+    """
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
 
-    # ===== Spatial density function
-    csv_out_sdf = os.path.join(dir_out, "RDF", "Spatial_density.csv")
-    if not os.path.exists(csv_out_sdf) or override:
-"""
+    # ===== Z-axis alignment
+    csv_out_z_axis_alignment = os.path.join(dir_out, "Etc", "Z_axis_alignment.csv")
+    if not os.path.exists(csv_out_z_axis_alignment) or override:
+        print("Calculating z-axis alignment...")
+        z_axis_alignment = mdevaluate_analysis.ref_vector_alignment(
+            vectors=mde_vectors, ref_vector=[0, 0, 1], num_segments=num_segments
+        )
 
-# ===== Step 17: Initialize the hydrogen bond information =====
-        if not os.path.exists(f'{workdir}/analysis/data_files/HBonds/All_HBonds_NEW.csv') or overwrite:
-            pbar.set_postfix(step="Initializing Hydrogen Bond Information")
-            hyd_bonds, unique_pairs = hbonds.hbonds(mdaUniverse=mda_universe, residue=residue, pore=True)
-            np.savetxt(f'{workdir}/analysis/data_files/HBonds/All_HBonds_NEW.csv', hyd_bonds, delimiter=',', fmt='%d,%d,%d,%s,%s,%d,%d,%s,%s,%.3f,%.2f', header='Frame,Donor_Index,Donor_ResID,Donor_ResName,Donor_Atom_Name,Acceptor_Index,Acceptor_ResID,Acceptor_ResName,Acceptor_Atom_Name,Distance,Angle')
-            try:
-                np.savetxt(f'{workdir}/analysis/data_files/HBonds/Unique_HBonds_IDs.csv', unique_pairs, delimiter=',', fmt='%d,%d,%s,%s,%d,%d,%d,%s,%s,%d', header='Donor_Index,Donor_ResID,Donor_ResName,Donor_Atom_Name,Hydrogen_Index,Acceptor_Index,Acceptor_ResName,Acceptor_ResID,Acceptor_Atom_Name,Number_of_Occurrences')
-            except ValueError:
-                pass
-            counts = hbonds.hbond_counts(hbonds=hyd_bonds, residue=residue)
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Z-axis alignment",
+            file_path=csv_out_z_axis_alignment,
+            parameters=params,
+        )
+        z_axis_alignment.to_csv(csv_out_z_axis_alignment, index=False)
 
-            for pair, count in counts.items():
-                helpers.log_info(workdir, f'{pair}: {count}')
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Z_axis_alignment.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            z_axis_alignment = pd.read_csv(csv_out_z_axis_alignment)
 
-            print("Finding Clusters...")
-            _, stats = hbonds.find_clusters(hbonds=hyd_bonds, filename=f'{workdir}/analysis/data_files/HBonds/Clusters_{residue}.txt')
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
 
-            if not stats == None:
-                helpers.log_info(workdir, stats)
-                with open(f'{workdir}/analysis/data_files/HBonds/Clusters_Summary_{residue}.txt', 'w') as f:
-                    f.write(stats)
-                    f.close()
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            z_axis_alignment.to_excel(
+                writer, sheet_name="Z-axis Alignment", index=False
+            )
 
-        pbar.update(1)
+        plot_line(
+            output_path=png_out,
+            x_data=z_axis_alignment.iloc[:, 0],
+            y_data=z_axis_alignment.iloc[:, 1:],
+            x_axis_label=r"$\theta$ / degrees",
+            y_axis_label=r"$\alpha_{\vec{z}}$($\theta$, t)",
+        )
 
-# ===== Step 18: Generate hydrogen bonds heatmap =====
-        #if not os.path.exists(f'{workdir}/analysis/graphs/HBonds/HBonds_heatmap_{residue}_{atom1}_{atom2}.png') or overwrite:
-        if 1 == 1:
-            pbar.set_postfix(step="Calculating hydrogen bonds heatmap")
-            hbonds.hbonds_heatmap(mda_universe=mda_universe, residue=residue, atom1=atom1, atom2=atom2, pore_diameter=pore_inf['D'], workdir=workdir, pore=True)
-        pbar.update(1)
+    # ===== xy-plane alignment
+    csv_out_xy_plane_alignment = os.path.join(dir_out, "Etc", "xy_plane_alignment.csv")
+    if not os.path.exists(csv_out_xy_plane_alignment) or override:
+        print("Calculating xy-plane alignment...")
+        z_axis_alignment = mdevaluate_analysis.ref_plane_alignment(
+            vectors=mde_vectors, normal_vector=[0, 0, 1], num_segments=num_segments
+        )
 
-# ===== Step 19: Generate positional heatmap for any hydrogen bonding species =====
-        #if not os.path.exists(f'{workdir}/analysis/graphs/HBonds_heatmap_{atom1}.png') or overwrite:
-        if 1 == 1:
-            pbar.set_postfix(step="Calculating positional heatmaps")
-            structural.radial_distances(mda_universe=mda_universe, workdir = workdir, pore_diameter=pore_inf['D'], exclusions='resname PORE')
-        pbar.update(1)
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="xy-plane alignment",
+            file_path=csv_out_xy_plane_alignment,
+            parameters=params,
+        )
+        z_axis_alignment.to_csv(csv_out_xy_plane_alignment, index=False)
 
-# ===== Step 20: Generate end to end distance =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/End_to_End/End_to_end_{residue}.png') or overwrite:
-            pbar.set_postfix(step="Calculating end-to-end distances")
-            structural.end_to_end(mda_universe=mda_universe, residue=residue, workdir=workdir)
-        pbar.update(1)
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "xy_plane_alignment.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            xy_plane_alignment = pd.read_csv(csv_out_xy_plane_alignment)
 
-# ===== Step 21: Calculate dihedral angles =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Dihedrals/dihedrals.png') or overwrite:
-            pbar.set_postfix(step="Gathering Dihedral Angles")
-            structural.dihedrals(workdir=workdir)
-        pbar.update(1)
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
 
-# ===== Step 22: Calculate radii of gyration =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/Gyration/gyration_summary.txt') or overwrite:
-            pbar.set_postfix(step="Gathering Radii of Gyration")
-            structural.gyration(workdir=workdir)
-        pbar.update(1)
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            xy_plane_alignment.to_excel(
+                writer, sheet_name="xy-Plane Alignment", index=False
+            )
 
-# ===== Complete! =====
-        pbar.set_postfix(step="Completed Full Analysis!")
-        pbar.update(1)
+        plot_line(
+            output_path=png_out,
+            x_data=xy_plane_alignment.iloc[:, 0],
+            y_data=xy_plane_alignment.iloc[:, 1:],
+            x_axis_label=r"$\theta$ / degrees",
+            y_axis_label=r"$\alpha_{XY}$($\theta$, t)",
+        )
 
-def minimal(args_dict: dict)-> None:
-    '''
-    Performs minimal analysis on a pore simulation (including MSD, RDF, and ISF).
+    # ============================================
+    # ===== Step 13: Identify hydrogen bonds =====
+    # ============================================
+    os.makedirs(os.path.join(dir_out, "HBonds"), exist_ok=True)
 
-    Args:
-        args_dict: A dictionary containing all of the imported arguments from main.py
-        ver_dir  : Name of the verification folder.
-    '''
-    workdir = args_dict['workdir']
-    segments = args_dict['segments']
-    residue = args_dict['residue']
-    atom1 = args_dict['atoms'][0]
-    atom2 = args_dict['atoms'][1]
-    q_val = args_dict['q_value'] if 'q_value' in args_dict.keys() else 0
-    overwrite = args_dict['overwrite']
-        
-    with tqdm(total=4, desc="Minimal Analysis Progress", unit="step") as pbar:
-# ===== Step 1: Initialize =====
-        pbar.set_postfix(step="Initializing")           # Sets the progress bar step seen on the right hand side of the terminal interface
-        # Loop through possible topology and trajectory names (add more if necessary; avoids issues with naming inconsistencies).
-        topologies = ["md.tpr", "run.tpr"]
-        trajectories = ["out/traj.xtc", "out/out.xtc"]
+    # ===== Initialize hydrogen bonds
+    csv_out_h_bonds = os.path.join(dir_out, "HBonds", "HBonds.csv")
+    if not os.path.exists(csv_out_h_bonds) or override:
+        print("Identifying hydrogen bonds...")
 
-        mde_trajectory = None
-    
-        for tpr in topologies:
-            for xtc in trajectories:
-                print(workdir, mde_trajectory)
-                try:
-                    mde_trajectory = mde.open(directory=workdir, topology=tpr, trajectory=xtc, nojump=True)
-                    mde_vectors = handle.handle_vectors(mde_trajectory=mde_trajectory, residue=residue, atom1=atom1, atom2=atom2)
-                    com = helpers.center_of_masses(trajectory=mde_trajectory, residue=residue)
-                    print(f"Opened with: topology={tpr}, trajectory={xtc}")
-                    break       # Break if successful
-                except FileNotFoundError:
-                    continue    # Continue if unsuccessful
-            if mde_trajectory is not None:
-                break           # Break if successful
-        if mde_trajectory is None:
-            raise FileNotFoundError("No valid combination of topology and trajectory files found.\nPlease ensure that the files exist and/or the file name is listed in the possible topology/trajectory names (bulk.py Step 1)")
-        
-        # Loop through possible configuration and trajectory names (add more if necessary)
-        configurations = ["out/out.gro", "out/md.gro"]
-        trajectories = ["out/traj.xtc", "out/out.xtc"]
+        h_bonds_df, mda_hbonds = hbonds.identify_h_bonds(
+            mda_coords=mda_coords, res_name=res_name
+        )
 
-        mda_universe = None
+        h_bonds_df.to_csv(csv_out_h_bonds, index=False)
 
-        for gro in configurations:
-            for xtc in trajectories:
-                print(f'{workdir}/{gro}')
-                try:
-                    mda_universe = mda.Universe(f'{workdir}/{gro}', f'{workdir}/{xtc}')
-                    print(f"Opened with: configuration={gro}, trajectory={xtc}")
-                    break       # Break if successful
-                except FileNotFoundError:
-                    continue    # Continue if unsuccessful
-            if mda_universe is not None:
-                break           # Break if successful
-        if mda_universe is None:
-            raise FileNotFoundError("No valid combination of topology and trajectory files found.\nPlease ensure that the files exist and/or the file name is listed in the possible topology/trajectory names (bulk.py Step 1)")
-        
-        pore_inf = {}
-        pore_dir = next((dir for dir in workdir.split('/') if 'pore_D' in dir), None)
-        if pore_dir:
-            for inf in re.findall(r'([DLWSEAV])(\d+\.?\d*)', pore_dir): # re.findall will search a string for a specific pattern and return all of the matches as a list.
-                pore_inf[inf[0]] = float(inf[1]) if '.' in inf[1] else int(inf[1])
-        helpers.log_info(workdir, pore_inf, f'\n@ ANALYSIS RESULTS', )  # Log extracted informati      
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            h_bonds_df.to_excel(writer, sheet_name="H Bonds", index=False)
 
-        pbar.update(1)          # Update the progress bar after initializing
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Initialized hydrogen bonds",
+            file_path=csv_out_h_bonds,
+            parameters=params,
+        )
 
-# ===== Step 2: Calculate the mean square displacement =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/MSD/MSD_{residue}.png') or overwrite:
-            pbar.set_postfix(step="Calculating average MSD")
-            msd = dynamics.average_msd(coords=com, num_segments=segments, pore=True)
-            plotting.plot_line(f'{workdir}/analysis/graphs/MSD/MSD_{residue}.png', msd[:,0], msd[:,1], msd[:,2], xlabel=r"$\mathbf{\mathit{t}}$ / ps",
-                               ylabel=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$", xscale='log', legend=True, handles=['Average', 'Z-Direction'])
-            np.savetxt(f'{workdir}/analysis/data_files/MSD/MSD_{residue}.csv', msd, delimiter=',', header='Time / ps, Average MSD, Average Z-MSD')
-        pbar.update(1)
+    # ===== Analyze hydrogen bonds
+    xlsx_out_hbonds = Path(os.path.join(dir_out, "HBonds", "hbonds_analysis.xlsx"))
+    if not os.path.exists(xlsx_out_hbonds) or override:
+        try:
+            h_bonds_df = pd.read_csv(csv_out_h_bonds)
 
-# ===== Step 3: Calculate the RDF / q constant =====
-        if q_val == 0 or overwrite:
-            pbar.set_postfix(step="Calculating RDF")
-            rdf, q_val, g_max = structural.rdf_com(com=com, segments=1000)
-            helpers.log_info(workdir, f'Value for q constant: {q_val}', f'Value for g max: {g_max}')
-            plotting.plot_line(f'{workdir}/analysis/graphs/RDF/rdf_{residue}_{atom1}_{atom2}.png', rdf[:,0], rdf[:,1], xlabel='r / nm', ylabel='g(r)')
-            np.savetxt(f'{workdir}/analysis/data_files/RDF/rdf_{residue}_{atom1}_{atom2}.csv', rdf, delimiter=',', header='r / nm, g(r)')
-        pbar.update(1)
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "Hydrogen bonds must be saved to .csv before analyzing."
+            )
+        print("Analyzing hydrogen bonds...")
+        wb = Workbook()
+        wb.save(xlsx_out_hbonds)
 
-# ===== Step 4: Calculate the ISF =====
-        if not os.path.exists(f'{workdir}/analysis/graphs/ISF/ISF_{residue}_{atom1}_{atom2}.png') or overwrite or q_val > 0:
-            pbar.set_postfix(step="Calculating ISF")
-            isf = dynamics.incoherent_scattering_function(coords=com, q_val=q_val, num_segments=segments, pore_diameter=pore_inf['D']/2)
-            plotting.plot_line(f'{workdir}/analysis/graphs/ISF/ISF_{residue}_{atom1}_{atom2}.png', isf[:,0], isf[:,1], isf[:,2], isf[:,3], xlabel=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
-                               ylabel=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$", xscale='log', legend=True, handles=['All', 'Wall', 'Center'])
-            np.savetxt(f'{workdir}/analysis/data_files/ISF/ISF_{residue}_{atom1}_{atom2}.csv', isf, delimiter=',', header='Time / ps, All, Wall, Center')
-        pbar.update(1)
+        results = hbonds.analyze_h_bonds(
+            h_bonds_df=h_bonds_df, xlsx_out=xlsx_out_hbonds
+        )
 
-# ===== Complete! =====
-        pbar.set_postfix(step="Completed Minimal Analysis!")
-        pbar.update(1)
-"""
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Hydrogen bond analysis",
+            file_path=str(xlsx_out_hbonds),
+            parameters=params,
+            results=results,
+        )
+
+    # ===== Hydrogen bonds heatmap
+    png_out = os.path.join(dir_out, "HBonds", "All_h_bonds_heatmap.png")
+    if not os.path.exists(png_out) or override:
+        try:
+            h_bonds_df = pd.read_csv(csv_out_h_bonds)
+
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "Hydrogen bonds must be saved to .csv before analyzing."
+            )
+
+        print("Generating hydrogen bond heatmaps...")
+
+        x_mesh, y_mesh, heatmaps = hbonds.hbonds_heatmap(
+            mda_coords=mda_coords, h_bonds_df=h_bonds_df, pore_diameter=pore_diameter
+        )
+
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Hydrogen bond heatmap",
+            file_path=png_out,
+            parameters=params,
+        )
+
+        for pair, heatmap in heatmaps.items():
+            png_out = os.path.join(dir_out, "HBonds", f"{pair}_heatmap.png")
+            plot_heatmap(
+                output_path=png_out, x_mesh=x_mesh, y_mesh=y_mesh, heatmap=heatmap
+            )
+
+    # ===== Hydrogen bond clusters
+    csv_out_clusters = os.path.join(dir_out, "HBonds", "H_bond_clusters.csv")
+    if not os.path.exists(csv_out_clusters) or override:
+        try:
+            h_bonds_df = pd.read_csv(csv_out_h_bonds)
+
+        except FileNotFoundError:
+            raise FileNotFoundError(
+                "Hydrogen bonds must be saved to .csv before analyzing."
+            )
+
+        print("Identifying hydrogen bond clusters...")
+
+        clusters, stats = hbonds.find_clusters(h_bonds_df=h_bonds_df)
+
+        clusters.to_csv(csv_out_clusters, index=False)
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            clusters.to_excel(writer, sheet_name="H Bond Clusters", index=False)
+
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Hydrogen bond clusters",
+            file_path=png_out,
+            parameters=params,
+            results=stats,
+        )
+
+    # ===========================================================
+    # ===== Step 14: Radius of gyration and gyration tensor =====
+    # ===========================================================
+    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
+
+    # ===== Radius of gyration
+    csv_out_rg = os.path.join(dir_out, "Etc", "Radius_of_gyration.csv")
+    if not os.path.exists(csv_out_rg) or override:
+        print("Calculating radii of gyration...")
+
+        rad_gyration = mdtraj_analysis.radius_of_gyration(mdt_coords=mdt_resid_traj)
+
+        results = {"Radius of gyration (average)": rad_gyration["Rg(t)"].mean()}
+
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Radius of gyration",
+            file_path=csv_out_rg,
+            parameters=params,
+        )
+        rad_gyration.to_csv(csv_out_rg, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Radius_of_gyration.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            rad_gyration = pd.read_csv(csv_out_rg)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            rad_gyration.to_excel(writer, sheet_name="Radius of gyration", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=rad_gyration.iloc[:, 0],
+            y_data=rad_gyration.iloc[:, 1:],
+            x_axis_label="t / ps",
+            y_axis_label=r"$R_{g}$(t)",
+            show_legend=False,
+            plot_size=(6, 6),
+        )
+
+    # ===== Gyration tensor
+    csv_out_tensor = os.path.join(dir_out, "Etc", "Gyration_tensor_eigenvalues.csv")
+    if not os.path.exists(csv_out_tensor) or override:
+        print("Calculating gyration tensor eigenvalues...")
+
+        eigenvalues = mdtraj_analysis.gyration_tensor(mdt_coords=mdt_resid_traj)
+
+        results = {
+            "Gyration tensor λ1 (average)": float(eigenvalues["n = 1"].mean()),
+            "Gyration tensor λ2 (average)": float(eigenvalues["n = 2"].mean()),
+            "Gyration tensor λ3 (average)": float(eigenvalues["n = 3"].mean()),
+        }
+
+        log_analysis_yaml(
+            log_path=yaml_out,
+            analysis_name="Radius of gyration",
+            file_path=csv_out_tensor,
+            parameters=params,
+            results=results,
+        )
+        eigenvalues.to_csv(csv_out_tensor, index=False)
+
+    # ===== Plot and save to .xlsx
+    png_out = os.path.join(dir_out, "Etc", "Gyration_tensor_eigenvalues.png")
+    if not os.path.exists(png_out) or override or plot_only:
+        try:
+            eigenvalues = pd.read_csv(csv_out_tensor)
+
+        except FileNotFoundError:
+            raise FileNotFoundError("CSV files must be generated prior to plotting.")
+
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            eigenvalues.to_excel(writer, sheet_name="Gyration tensor", index=False)
+
+        plot_line(
+            output_path=png_out,
+            x_data=eigenvalues.iloc[:, 0],
+            y_data=eigenvalues.iloc[:, 1:],
+            x_axis_label="t / ps",
+            y_axis_label=r"$\lambda_{n}$(t) / $nm^2$",
+        )
 
 cli.add_command(Run)
 

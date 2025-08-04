@@ -1,22 +1,12 @@
 __author__ = 'Markus Hoffmann'
 
 from functools import partial
-import os
-import os.path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib import cm
-from scipy.optimize import curve_fit, root
-from scipy import constants
-import math
-import mdevaluate as md
-from scipy.special import gamma
-from numpy.typing import ArrayLike, NDArray
-from functools import partial
-import argparse
+from .. import mdevaluate as md
 
-workdir = "/media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system"
+workdir = "/home/tee/pore_files_FINAL/simulations/noreservoir/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system"
 resname = "OCT"
 q_const = 11.64
 segments = 10
@@ -95,26 +85,31 @@ def isf_mean_var(
 
 def non_Gauss(workdir, trajectory, com, resname, segments):
     t, S = md.correlation.shifted_correlation(
-        partial(md.correlation.revised_alpha_parameter, full_output=True),
-        com.nojump, average=False, description='rough', segments=max(5,kwargs['segments'] // 50), window=kwargs['window'], skip=kwargs['skip'])
+        partial(md.correlation.revised_alpha_parameter),
+        com, average=False, description='rough', segments=segments)
+    t, T = md.correlation.shifted_correlation(
+        partial(md.correlation.revised_alpha_parameter),
+        com, average=True, description='rough', segments=segments)
 
-    m2 = S[:,:,1].mean(axis=0); m4 = S[:,:,2].mean(axis=0) # here the moments from each segment are averaged
-    m2[0] = 1
+    m2 = S[:,:,1].mean(axis=0)
+    m4 = S[:,:,2].mean(axis=0) # here the moments from each segment are averaged
+
     d = 3
     S = (m4 / ((1 + 2 / d) * m2 ** 2)) - 1 # finally alpha_2 is calculated
-    S[0] = 0
 
- #   time, result = md.correlation.shifted_correlation(md.correlation.non_gaussian_parameter
-  #                                          ,com, segments= segments)
+    S[0] = 0
+    time, result = md.correlation.shifted_correlation(partial(md.correlation.non_gaussian_parameter),com, segments= segments)
     fig, ax = plt.subplots(1, 1)
     ax.set_title(f"{resname}_alpha")
-    ax.plot(time, result,"*" ,label=resname)
+    ax.plot(time, np.column_stack([result, S]))
 
     ax.set_xscale("log")  
     #ax.set_yscale("log")
     ax.legend()
     ax.set_xlabel(r"$t$ / ps")
     ax.set_ylabel(r"$non-gauss$")
+    plt.show()
+    raise NotImplementedError
     fig.savefig(workdir + "/analysis/graphs/newnonGauss_" + resname)
     df = pd.DataFrame({'# t in ps': t, 'nonGauss': S})
     df.to_csv(workdir + "/analysis/xvg_files/newnonGauss_" + resname +".xvg", sep=' ', index=False)

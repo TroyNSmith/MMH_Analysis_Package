@@ -485,31 +485,32 @@ def revised_alpha_parameter(
     else:
         vectors = displacements_without_drift(start_frame, end_frame, trajectory)
     if axis == "all":
-        r2 = (vectors**2).sum(axis=1)
+        r = (vectors**2).sum(axis=1)
         dimensions = 3
     elif axis == "xy" or axis == "yx":
-        r2 = (vectors[:, [0, 1]]**2).sum(axis=1)
+        r = (vectors[:, [0, 1]]**2).sum(axis=1)
         dimensions = 2
     elif axis == "xz" or axis == "zx":
-        r2 = (vectors[:, [0, 2]]**2).sum(axis=1)
+        r = (vectors[:, [0, 2]]**2).sum(axis=1)
         dimensions = 2
     elif axis == "yz" or axis == "zy":
-        r2 = (vectors[:, [1, 2]]**2).sum(axis=1)
+        r = (vectors[:, [1, 2]]**2).sum(axis=1)
         dimensions = 2
     elif axis == "x":
-        r2 = vectors[:, 0] ** 2
+        r = vectors[:, 0] ** 2
         dimensions = 1
     elif axis == "y":
-        r2 = vectors[:, 1] ** 2
+        r = vectors[:, 1] ** 2
         dimensions = 1
     elif axis == "z":
-        r2 = vectors[:, 2] ** 2
+        r = vectors[:, 2] ** 2
         dimensions = 1
     else:
-        raise ValueError('Parameter axis has to be ether "all", "x", "y", or "z"!')
+        raise ValueError('Parameter axis has to be "all", "x", "y", or "z"!')
 
-    m2 = np.mean(r2)
-    m4 = np.mean(r2**2)
-    alpha_2 = (m4 / ((1 + 2 / dimensions) * m2**2)) - 1
-    return alpha_2, m2, m4
+    second_moment = np.mean(r)
+    fourth_moment = np.mean(r**2)
+    alpha = (fourth_moment / ((1 + 2 / dimensions) * second_moment**2)) - 1
+
+    return alpha, second_moment, fourth_moment
 
