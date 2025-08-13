@@ -7,11 +7,23 @@
 # Specify a q value for each simulation. If q_values is empty, they will be independently generated instead.
 
 workdirs=(
-    /home/tee/pore_files_FINAL/simulations/noreservoir/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-)
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/7_nvt_prod2_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358R/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system_short_run
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system_short_run
+    )
 
-DIAMETER=3.0 # Use None for systems other than pore
-SEGMENTS=10
+DIAMETER=3.0
+SEGMENTS=500
 
 q_values=(
     12.6
@@ -28,17 +40,14 @@ residue_atom_list=(
 :<<EOC
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/298K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/298K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/7_nvt_prod2_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358R/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/298K/5_nvt_prod_system
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
 EOC
 
@@ -63,7 +72,7 @@ run_python_script() {
     LOGTMP="$(mktemp)"
     if [ ${#q_values[@]} -gt 0 ]; then
         for q in "${q_values[@]}"; do
-            python -m pkg.pore run -i "$WORKDIR" -tr out/traj.xtc -tp run.tpr -st out/out.gro -r "$RESIDUE" -a "$ATOM1" "$ATOM2" -s "$SEGMENTS" -d "$DIAMETER" -q "$q" -ov \
+            python -m pkg.pore run -i "$WORKDIR" -tr out/traj.xtc -tp run.tpr -st out/out.gro -r "$RESIDUE" -a "$ATOM1" "$ATOM2" -s "$SEGMENTS" -d "$DIAMETER" -q "$q" \
                 > >(tee "$LOGTMP") \
                 2> >(tee -a "$LOGTMP" >&2)
         done

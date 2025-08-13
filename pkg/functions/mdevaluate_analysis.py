@@ -64,6 +64,7 @@ def incoherent_scattering_function(
     coords: mde.coordinates.CoordinatesMap,
     q_val: float,
     num_segments: int = 500,
+    axis: str = "all",
     radially_resolved: bool = False,
     pore_diameter: float = 0.0,
     num_bins: int = 3,
@@ -91,7 +92,7 @@ def incoherent_scattering_function(
         ]
 
         times, results = mde.correlation.shifted_correlation(
-            partial(mde.correlation.isf, q=q_val),
+            partial(mde.correlation.isf, q=q_val, axis=axis),
             coords,
             selector=partial(multi_radial_selector, bins=bins),
             segments=num_segments,
@@ -101,10 +102,12 @@ def incoherent_scattering_function(
         df = pd.DataFrame(np.column_stack([times, *results]), columns=column_labels)
 
     else:
-        column_labels = ["time / ps", "Total"]
+        column_labels = ["time / ps", f"ISF ({axis})"]
 
         times, results = mde.correlation.shifted_correlation(
-            partial(mde.correlation.isf, q=q_val), coords, segments=num_segments
+            partial(mde.correlation.isf, q=q_val, axis=axis),
+            coords,
+            segments=num_segments,
         )
 
         df = pd.DataFrame(

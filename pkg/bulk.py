@@ -5,13 +5,13 @@ import numpy as np
 import os
 import pandas as pd
 
-from . import mdevaluate as mde
+from .. import mdevaluate as mde
 from openpyxl import Workbook
 from pathlib import Path
 
 from .functions import mdevaluate_analysis, mdtraj_analysis
 from .utils.coordinates import centers_of_masses, vectorize_residue
-from .utils.plotting import plot_heatmap, plot_line
+from .utils.plotting import plot_line
 from .functions import mdanalysis_analysis as hbonds
 from .utils.logging import log_analysis_yaml
 
@@ -327,58 +327,25 @@ def Run(
         )
         msd_all.to_csv(csv_out_all, index=False)
 
-    # ===== Residual MSD (z-axis)
-    csv_out_z = os.path.join(dir_out, "MSD", "MSD_z.csv")
-    if not os.path.exists(csv_out_z) or override:
-        print("Calculating z-axis MSD...")
-        msd_z = mdevaluate_analysis.mean_square_displacement(
-            coords=mde_com, axis="z", num_segments=num_segments
-        )
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="MSD (z-axis)",
-            file_path=csv_out_z,
-            parameters=params,
-        )
-        msd_z.to_csv(csv_out_z, index=False)
-
-    # ===== Residual MSD (xy-plane)
-    csv_out_xy = os.path.join(dir_out, "MSD", "MSD_xy.csv")
-    if not os.path.exists(csv_out_xy) or override:
-        print("Calculating xy-plane MSD...")
-        msd_xy = mdevaluate_analysis.mean_square_displacement(
-            coords=mde_com, axis="xy", num_segments=num_segments
-        )
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="MSD (xy-plane)",
-            file_path=csv_out_xy,
-            parameters=params,
-        )
-        msd_xy.to_csv(csv_out_xy, index=False)
 
     # ===== Plot and save to .xlsx
     png_out = os.path.join(dir_out, "MSD", "MSD.png")
     if not os.path.exists(png_out) or override or plot_only:
         try:
             msd_all = pd.read_csv(csv_out_all)
-            msd_z = pd.read_csv(csv_out_z)
-            msd_xy = pd.read_csv(csv_out_xy)
 
         except FileNotFoundError:
             raise FileNotFoundError("CSV files must be generated prior to plotting.")
 
-        msd_merged = pd.concat([msd_all, msd_z.iloc[:, 1], msd_xy.iloc[:, 1]], axis=1)
-
         with pd.ExcelWriter(
             xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            msd_merged.to_excel(writer, sheet_name="MSD", index=False)
+            msd_all.to_excel(writer, sheet_name="MSD", index=False)
 
         plot_line(
             output_path=png_out,
-            x_data=msd_merged.iloc[:, 0],
-            y_data=msd_merged.iloc[:, 1:],
+            x_data=msd_all.iloc[:, 0],
+            y_data=msd_all.iloc[:, 1:],
             x_axis_scale="log",
             x_axis_label=r"$\mathbf{\mathit{t}}$ / ps",
             y_axis_scale="log",
@@ -405,37 +372,14 @@ def Run(
         )
         msd_resolved.to_csv(csv_out_resolved, index=False)
 
-    # ===== Plot and save to .xlsx
-    png_out = os.path.join(dir_out, "MSD", "MSD_resolved.png")
-    if not os.path.exists(png_out) or override or plot_only:
-        try:
-            msd_resolved = pd.read_csv(csv_out_resolved)
-
-        except FileNotFoundError:
-            raise FileNotFoundError("CSV files must be generated prior to plotting.")
-
-        with pd.ExcelWriter(
-            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
-        ) as writer:
-            msd_resolved.to_excel(writer, sheet_name="MSD Resolved", index=False)
-
-        plot_line(
-            output_path=png_out,
-            x_data=msd_resolved.iloc[:, 0],
-            y_data=msd_resolved.iloc[:, 1:],
-            x_axis_scale="log",
-            x_axis_label=r"$\mathbf{\mathit{t}}$ / ps",
-            y_axis_scale="log",
-            y_axis_label=r"<r$^2$> / nm$^2$$\cdot$ps$^{-1}$",
-        )
 
     # ==================================================
     # ===== Step 5: Incoherent scattering function =====
     # ==================================================
     os.makedirs(os.path.join(dir_out, "ISF"), exist_ok=True)
 
-    # ===== Residual ISF (total)
-    csv_out_isf = os.path.join(dir_out, "ISF", "ISF_total.csv")
+    # ===== Residual ISF
+    csv_out_isf = os.path.join(dir_out, "ISF", "ISF.csv")
     if not os.path.exists(csv_out_isf) or override:
         print("Calculating ISF...")
         isf_total = mdevaluate_analysis.incoherent_scattering_function(
@@ -451,93 +395,25 @@ def Run(
         )
         isf_total.to_csv(csv_out_isf, index=False)
 
-    # ===== Residual ISF (xy-plane)
-    csv_out_isf_xy = os.path.join(dir_out, "ISF", "ISF_xy_plane.csv")
-    if not os.path.exists(csv_out_isf_xy) or override:
-        print("Calculating ISF...")
-        isf_total = mdevaluate_analysis.incoherent_scattering_function(
-            coords=mde_com,
-            q_val=q_val,
-            num_segments=num_segments,
-            axis="xy",
-        )
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="ISF (xy-plane)",
-            file_path=csv_out_isf_xy,
-            parameters=params,
-        )
-        isf_total.to_csv(csv_out_isf_xy, index=False)
-
-    # ===== Residual ISF (z-axis)
-    csv_out_isf_z = os.path.join(dir_out, "ISF", "ISF_z_axis.csv")
-    if not os.path.exists(csv_out_isf_z) or override:
-        print("Calculating ISF...")
-        isf_total = mdevaluate_analysis.incoherent_scattering_function(
-            coords=mde_com,
-            q_val=q_val,
-            num_segments=num_segments,
-            axis="z",
-        )
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="ISF (z-axis)",
-            file_path=csv_out_isf_z,
-            parameters=params,
-        )
-        isf_total.to_csv(csv_out_isf_z, index=False)
-
-    # ===== Residual ISF (resolved)
-    csv_out_isf_resolved = os.path.join(dir_out, "ISF", "ISF_resolved.csv")
-    if not os.path.exists(csv_out_isf_resolved) or override:
-        print("Calculating resolved ISF...")
-        isf_resolved = mdevaluate_analysis.incoherent_scattering_function(
-            coords=mde_com,
-            q_val=q_val,
-            num_segments=num_segments,
-            radially_resolved=True,
-            pore_diameter=pore_diameter,
-            num_bins=3,
-        )
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="ISF (resolved)",
-            file_path=csv_out_isf_resolved,
-            parameters=params,
-        )
-        isf_resolved.to_csv(csv_out_isf_resolved, index=False)
 
     # ===== Plot and save to .xlsx
     png_out = os.path.join(dir_out, "ISF", "ISF.png")
     if not os.path.exists(png_out) or override or plot_only:
         try:
             isf_total = pd.read_csv(csv_out_isf)
-            isf_xy_plane = pd.read_csv(csv_out_isf_xy)
-            isf_z_axis = pd.read_csv(csv_out_isf_z)
-            isf_resolved = pd.read_csv(csv_out_isf_resolved)
 
         except FileNotFoundError:
             raise FileNotFoundError("CSV files must be generated prior to plotting.")
 
-        isf_merged = pd.concat(
-            [
-                isf_total,
-                isf_xy_plane.iloc[:, 1:],
-                isf_z_axis.iloc[:, 1:],
-                isf_resolved.iloc[:, 1:],
-            ],
-            axis=1,
-        )
-
         with pd.ExcelWriter(
             xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
         ) as writer:
-            isf_merged.to_excel(writer, sheet_name="ISF", index=False)
+            isf_total.to_excel(writer, sheet_name="ISF", index=False)
 
         plot_line(
             output_path=png_out,
-            x_data=isf_merged.iloc[:, 0],
-            y_data=isf_merged.iloc[:, 1:],
+            x_data=isf_total.iloc[:, 0],
+            y_data=isf_total.iloc[:, 1:],
             x_axis_scale="log",
             x_axis_label="t / ps",
             y_axis_label=f"ISF(q={q_val:.1f}, t)",
@@ -634,59 +510,13 @@ def Run(
             y_axis_label="F(θ, t)",
         )
 
-    # ===========================================================
-    # ===== Step 8: Translational van Hove Self-Correlation =====
-    # ===========================================================
-    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
-
-    # ===== Translational van Hove
-    csv_out_trans_van_Hove = os.path.join(dir_out, "Etc", "Translational_van_Hove.csv")
-    if not os.path.exists(csv_out_trans_van_Hove) or override:
-        print("Calculating translational van Hove self-correlation...")
-        trans_van_Hove = mdevaluate_analysis.van_hove_translation(
-            coords=mde_com,
-            num_segments=num_segments,
-            pore_diameter=pore_diameter,
-            num_bins=250,
-        )
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="Translational van Hove",
-            file_path=csv_out_trans_van_Hove,
-            parameters=params,
-        )
-        trans_van_Hove.to_csv(csv_out_trans_van_Hove, index=False)
-
-    # ===== Plot and save to .xlsx
-    png_out = os.path.join(dir_out, "Etc", "Translational_van_Hove.png")
-    if not os.path.exists(png_out) or override or plot_only:
-        try:
-            trans_van_Hove = pd.read_csv(csv_out_trans_van_Hove)
-
-        except FileNotFoundError:
-            raise FileNotFoundError("CSV files must be generated prior to plotting.")
-
-        with pd.ExcelWriter(
-            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
-        ) as writer:
-            trans_van_Hove.to_excel(
-                writer, sheet_name="Translational van Hove", index=False
-            )
-
-        plot_line(
-            output_path=png_out,
-            x_data=trans_van_Hove.iloc[:, 0],
-            y_data=trans_van_Hove.iloc[:, 2:],
-            x_axis_label="r / nm",
-            y_axis_label="F(r, t)",
-        )
 
     # ==========================================
     # ===== Step 9: Non-Gaussian Parameter =====
     # ==========================================
     os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
 
-    # ===== Non-Gaussian alpha parameter
+    # ===== Translational van Hove
     csv_out_non_gauss = os.path.join(dir_out, "Etc", "non_Gaussian_parameter.csv")
     if not os.path.exists(csv_out_non_gauss) or override:
         print("Calculating non-Gaussian parameters...")
@@ -772,147 +602,6 @@ def Run(
             y_axis_label=rf"$χ_4(q={q_val:.1f}, t)$",
         )
 
-    # =============================================
-    # ===== Step 11: Spatial density function =====
-    # =============================================
-    os.makedirs(os.path.join(dir_out, "RDF"), exist_ok=True)
-
-    # ===== Spatial density function
-    csv_out_sdf = os.path.join(dir_out, "RDF", "Spatial_density.csv")
-    if not os.path.exists(csv_out_sdf) or override:
-        print("Calculating spatial density functions...")
-
-        res_atom_pairs = {
-            res_name: atoms,
-            "LNK": ["NL"],
-            "ETH": ["OEE"],
-            "VAN": ["NV", "OVE", "OVH"],
-        }
-
-        sdf = mdevaluate_analysis.spatial_density_function(
-            coords=mde_coords,
-            res_atom_pairs=res_atom_pairs,
-            pore_diameter=pore_diameter,
-        )
-        params["res_atom_pairs"] = res_atom_pairs
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="Spatial density function",
-            file_path=csv_out_sdf,
-            parameters=params,
-        )
-        del params["res_atom_pairs"]
-        sdf.to_csv(csv_out_sdf, index=False)
-
-    # ===== Plot and save to .xlsx
-    png_out = os.path.join(dir_out, "RDF", "Spatial_density.png")
-    if not os.path.exists(png_out) or override or plot_only:
-        try:
-            sdf = pd.read_csv(csv_out_sdf)
-
-        except FileNotFoundError:
-            raise FileNotFoundError("CSV files must be generated prior to plotting.")
-
-        with pd.ExcelWriter(
-            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
-        ) as writer:
-            sdf.to_excel(writer, sheet_name="Spatial density function", index=False)
-
-        plot_line(
-            output_path=png_out,
-            x_data=sdf.iloc[:, 0],
-            y_data=sdf.iloc[:, 1:],
-            x_axis_label="r / nm",
-            y_axis_label=r"Number density / Units $\cdot$ nm$^3$",
-        )
-
-    # ==================================================
-    # ===== Step 12: Z-axis and xy-plane alignment =====
-    # ==================================================
-    """
-    For best results, utilize (small) vectorized molecular segments (e.g. OCT H00: O01) rather than whole vectorized residues (e.g. OCT O01: C0O)
-    """
-    os.makedirs(os.path.join(dir_out, "Etc"), exist_ok=True)
-
-    # ===== Z-axis alignment
-    csv_out_z_axis_alignment = os.path.join(dir_out, "Etc", "Z_axis_alignment.csv")
-    if not os.path.exists(csv_out_z_axis_alignment) or override:
-        print("Calculating z-axis alignment...")
-        z_axis_alignment = mdevaluate_analysis.ref_vector_alignment(
-            vectors=mde_vectors, ref_vector=[0, 0, 1], num_segments=num_segments
-        )
-
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="Z-axis alignment",
-            file_path=csv_out_z_axis_alignment,
-            parameters=params,
-        )
-        z_axis_alignment.to_csv(csv_out_z_axis_alignment, index=False)
-
-    # ===== Plot and save to .xlsx
-    png_out = os.path.join(dir_out, "Etc", "Z_axis_alignment.png")
-    if not os.path.exists(png_out) or override or plot_only:
-        try:
-            z_axis_alignment = pd.read_csv(csv_out_z_axis_alignment)
-
-        except FileNotFoundError:
-            raise FileNotFoundError("CSV files must be generated prior to plotting.")
-
-        with pd.ExcelWriter(
-            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
-        ) as writer:
-            z_axis_alignment.to_excel(
-                writer, sheet_name="Z-axis Alignment", index=False
-            )
-
-        plot_line(
-            output_path=png_out,
-            x_data=z_axis_alignment.iloc[:, 0],
-            y_data=z_axis_alignment.iloc[:, 1:],
-            x_axis_label=r"$\theta$ / degrees",
-            y_axis_label=r"$\alpha_{\vec{z}}$($\theta$, t)",
-        )
-
-    # ===== xy-plane alignment
-    csv_out_xy_plane_alignment = os.path.join(dir_out, "Etc", "xy_plane_alignment.csv")
-    if not os.path.exists(csv_out_xy_plane_alignment) or override:
-        print("Calculating xy-plane alignment...")
-        z_axis_alignment = mdevaluate_analysis.ref_plane_alignment(
-            vectors=mde_vectors, normal_vector=[0, 0, 1], num_segments=num_segments
-        )
-
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="xy-plane alignment",
-            file_path=csv_out_xy_plane_alignment,
-            parameters=params,
-        )
-        z_axis_alignment.to_csv(csv_out_xy_plane_alignment, index=False)
-
-    # ===== Plot and save to .xlsx
-    png_out = os.path.join(dir_out, "Etc", "xy_plane_alignment.png")
-    if not os.path.exists(png_out) or override or plot_only:
-        try:
-            xy_plane_alignment = pd.read_csv(csv_out_xy_plane_alignment)
-
-        except FileNotFoundError:
-            raise FileNotFoundError("CSV files must be generated prior to plotting.")
-
-        with pd.ExcelWriter(
-            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
-        ) as writer:
-            xy_plane_alignment.to_excel(
-                writer, sheet_name="xy-Plane Alignment", index=False
-            )
-
-        plot_line(
-            output_path=png_out,
-            x_data=xy_plane_alignment.iloc[:, 0],
-            y_data=xy_plane_alignment.iloc[:, 1:],
-            x_axis_label=r"$\theta$ / degrees",
-            y_axis_label=r"$\alpha_{XY}$($\theta$, t)",
-        )
 
     # ============================================
     # ===== Step 13: Identify hydrogen bonds =====
@@ -930,13 +619,10 @@ def Run(
 
         h_bonds_df.to_csv(csv_out_h_bonds, index=False)
 
-        try:
-            with pd.ExcelWriter(
-                xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
-            ) as writer:
-                h_bonds_df.to_excel(writer, sheet_name="H Bonds", index=False)
-        except ValueError:
-            pass
+        with pd.ExcelWriter(
+            xlsx_out, engine="openpyxl", mode="a", if_sheet_exists="replace"
+        ) as writer:
+            h_bonds_df.to_excel(writer, sheet_name="H Bonds", index=False)
 
         log_analysis_yaml(
             log_path=yaml_out,
@@ -947,7 +633,7 @@ def Run(
 
     # ===== Analyze hydrogen bonds
     xlsx_out_hbonds = Path(os.path.join(dir_out, "HBonds", "hbonds_analysis.xlsx"))
-    if not os.path.exists(xlsx_out_hbonds) or override or True is True:
+    if not os.path.exists(xlsx_out_hbonds) or override:
         try:
             h_bonds_df = pd.read_csv(csv_out_h_bonds)
 
@@ -971,40 +657,9 @@ def Run(
             results=results,
         )
 
-    # ===== Hydrogen bonds heatmap
-    png_out = os.path.join(dir_out, "HBonds", "All_h_bonds_heatmap.png")
-    if not os.path.exists(png_out) or override:
-        try:
-            h_bonds_df = pd.read_csv(csv_out_h_bonds)
-
-        except FileNotFoundError:
-            raise FileNotFoundError(
-                "Hydrogen bonds must be saved to .csv before analyzing."
-            )
-
-        print("Generating hydrogen bond heatmaps...")
-
-        x_mesh, y_mesh, heatmaps = hbonds.hbonds_heatmap(
-            mda_coords=mda_coords, h_bonds_df=h_bonds_df, pore_diameter=pore_diameter
-        )
-
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="Hydrogen bond heatmap",
-            file_path=png_out,
-            parameters=params,
-        )
-
-        for pair, heatmap in heatmaps.items():
-            png_out = os.path.join(dir_out, "HBonds", f"{pair}_heatmap.png")
-            plot_heatmap(
-                output_path=png_out, x_mesh=x_mesh, y_mesh=y_mesh, heatmap=heatmap
-            )
-
     # ===== Hydrogen bond clusters
     csv_out_clusters = os.path.join(dir_out, "HBonds", "H_bond_clusters.csv")
-    # if not os.path.exists(csv_out_clusters) or override:
-    if True is False:  # Temporary skip (taking too long for testing)
+    if not os.path.exists(csv_out_clusters) or override:
         try:
             h_bonds_df = pd.read_csv(csv_out_h_bonds)
 
@@ -1116,32 +771,6 @@ def Run(
             x_axis_label="t / ps",
             y_axis_label=r"$\lambda_{n}$(t) / $nm^2$",
         )
-
-    # ============================================
-    # ===== Step 15: Animate residue in pore =====
-    # ============================================
-    os.makedirs(os.path.join(dir_out, "HBonds"), exist_ok=True)
-
-    # ===== Animate residue in pore
-    mp4_out = os.path.join(dir_out, "HBonds", f"{res_name}_animation.mp4")
-    if not os.path.exists(mp4_out) or override:
-        print("Animating residue in pore...")
-
-        hbonds.animate_resname(
-            mda_coords=mda_coords,
-            res_name=res_name,
-            pore_diameter=pore_diameter,
-            mp4_out=mp4_out,
-            n_res=20,
-        )
-
-        log_analysis_yaml(
-            log_path=yaml_out,
-            analysis_name="Residue animation",
-            file_path=mp4_out,
-            parameters=params,
-        )
-
 
 cli.add_command(Run)
 
