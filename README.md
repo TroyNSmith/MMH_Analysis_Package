@@ -130,3 +130,4 @@ residue_atom_list=(
 ```
 bash pore.sh
 ```
+7. The bash script will proceed to iterate through every combination of the entries in `workdirs`, `q_values`, and `residue_atom_list`.
