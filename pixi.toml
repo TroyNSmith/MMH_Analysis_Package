@@ -5,9 +5,6 @@ name = "MMH_Analysis_Package"
 platforms = ["linux-64"]
 version = "0.1.0"
 
-[tasks]
-pore = "bash pkg/pore.sh"
-
 [dependencies]
 mdanalysis = ">=2.9.0,<3"
 mdtraj = ">=1.11.0,<2"
