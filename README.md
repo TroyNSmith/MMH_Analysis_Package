@@ -29,7 +29,7 @@ All dependencies and tools will be available automatically in this shell.
 ## How to use
 Ensure that the pixi environment has been activated or all dependencies have been installed locally through an environment manager like mamba or conda.
 
-For all of the scripts, ensure that your terminal is located within the `src` directory:
+For all of the scripts, ensure that your terminal is currently within the `src` directory:
 
 ```
 cd src/
@@ -37,3 +37,33 @@ cd src/
 
 ### pore.py
 
+Within the `src` directory, call the main `Run` function in pore.py:
+
+```
+python -m pore Run --help
+```
+
+#### Options:
+--- Input / Output --
+* -i / --input (str) : Path/to/the/simulation/directory
+ * Path of the parent directory for topology (.tpr), trajectory (.xtc), and structure (.gro) files.
+ *  ex: `-i /home/tnsmith/simulations/octanol/nvt_prod/`
+* -tr / --trajectory: *input*/path/to/trajectory
+ * Path to the trajectory file starting from the path specified by --input.
+ *  ex: `-tr out/out.xtc`
+* -tp / --topology: *input*/path/to/topology
+ * Path to the topology file starting from the path specified by --input.
+ *  ex: `-tr run.tpr`
+* -st / --structure: *input*/path/to/structure
+ * Path to the structure file starting from the path specified by --input.
+ *  ex: `-st out/out.gro`
+* -o / --output (str) : Path/to/the/output/directory (opt.)
+ * Path of a directory to reroute output folders/files. (default = None)
+ *  ex: `-o /home/tnsmith/simulations/octanol/nvt_prod/`
+* res_name: str,
+* atoms: list[str],
+* num_segments: int,
+* pore_diameter: float,
+* q_val: float,
+* override: bool,
+* plot_only: bool
