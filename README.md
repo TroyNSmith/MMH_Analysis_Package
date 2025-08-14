@@ -16,7 +16,7 @@ pixi --version
 
 Then restart your terminal (or follow the post-install instructions to update your `PATH`).
 
-Inside the project folder, **activate** the environment:
+Inside the MMH Analysis Package folder, **activate** the environment:
 ```
 pixi shell
 ```
@@ -27,4 +27,13 @@ All dependencies and tools will be available automatically in this shell.
 *Note: A custom version of mdevaluate is hosted as a local module within this package.*
 
 ## How to use
-A variety of python and bash scripts are contained in `src/`.
+Ensure that the pixi environment has been activated or all dependencies have been installed locally through an environment manager like mamba or conda.
+
+For all of the scripts, ensure that your terminal is located within the `src` directory:
+
+```
+cd src/
+```
+
+### pore.py
+
