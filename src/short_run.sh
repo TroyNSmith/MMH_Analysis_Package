@@ -24,51 +24,7 @@ workdirs=(
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/358K
 )
 
-# A list of q values to use with the corresponding directory in workdirs. The two lists MUST be the same length.
-# You may get the q values from summary.txt for the desired simulation.
-# Note 1: 1.0 is a dummy q value for testing purposes--if you see it, keep looking higher in the file until you find a valid number.
-# Note 2: Leave this list empty if you do not wish to use a pre-determined q value.
-q_values=(
-    3.10850211356711
-    4.694306182092584
-    2.0640041580756376
-    3.049674105241572
-    4.970701360515549
-    3.730476513978905
-    7.262793407559881
-    1.5148879819240033
-    1.7513057876555778
-    2.291061588058136
-    2.729047474125677
-    2.2197082967193604
-    1.475873565144969
-    9.229815700703762
-)
-SYS="Pore"
-SEGMENTS=1000
-
-# Define residues and their atom pairs: format is "RESIDUE ATOM1 ATOM2"
-residue_atom_list=(
-  "OCT O01 C0O"
-)
-
-# List for end-to-end of all PEG monomers (copy the lines with quotes only)
-:<<PEG
-  "DEG OAD1 OAD2"
-  "REG OAR1 OAR2"
-  "TEG OAT1 OAT2"
-  "PEG OAP1 OAP2"
-  "XEG OAX1 OAX2"
-  "HEG OAH1 OAH2"
-PEG
-# List of possible Octanol (OPLS parameterizations) choices (do not copy the comments)
-:<<OCT
-  "OCT O01 H00"     # Hydroxy
-  "OCT O01 C0O"     # End-to-end
-OCT
-# =====================================================
-
-# ===== Universal Functions =====
+# --- Universal Functions ---
 write_mdp() {
     cat << EOF > $EXTDIR/mdp_nvt_prod_system_short_run.mdp
 ; very basics of the simulation 
@@ -129,33 +85,8 @@ continuation             = yes             ; no for applying constraints at star
 EOF
 }
 
-run_python_script() {
-    Q="$1"  # First argument is the optional q-value
-
-    shift 1 # Shift the remaining arguments to $1, $2, $3...
-
-    if [ -n "$Q" ]; then
-        python main.py -w "$EXTDIR" -sys "$SYS" -s "$SEGMENTS" -a "$2" "$3" -r "$1" -q "$Q" -m
-    else
-        python main.py -w "$EXTDIR" -sys "$SYS" -s "$SEGMENTS" -a "$2" "$3" -r "$1" -m
-    fi
-
-    status=$?
-    if [ $status -ne 0 ]; then
-        echo "Uh oh! It seems there was an issue! Python exited with status code $status."
-        exit $status
-    fi
-}
-
-# =====================================================
-
-echo "Running full loop over workdirs and residue-atom sets..."
-
-use_q_values=false
-
-if [ ${#q_values[@]} -gt 0 ]; then
-    use_q_values=true
-fi
+# --- Perform short simulations in all of the directories
+echo "Running full loop over workdirs..."
 
 for i in "${!workdirs[@]}"; do
     WORKDIR="${workdirs[$i]}"
@@ -203,16 +134,4 @@ for i in "${!workdirs[@]}"; do
         mkdir -p "$EXTDIR"/analysis/graphs/{MSD,ISF,RDF}
         mkdir -p "$EXTDIR"/analysis/data_files/{MSD,ISF,RDF}
     fi
-
-    for entry in "${residue_atom_list[@]}"; do
-        read -r RESIDUE ATOM1 ATOM2 <<< "$entry"
-        echo "  → Running for residue: $RESIDUE with atoms $ATOM1, $ATOM2"
-
-        if $use_q_values; then
-            run_python_script "$Q" "$RESIDUE" "$ATOM1" "$ATOM2"
-        else
-            run_python_script "" "$RESIDUE" "$ATOM1" "$ATOM2"       # Needs the empty argument if Q is not available!
-        fi
-    done
-
 done
