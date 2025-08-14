@@ -109,8 +109,8 @@ workdirs=(
 ```
 3. Update the pore diameter and number of segments :
 ```
-DIAMETER=3.0 &larr; Change these
-SEGMENTS=500 &larr; values as needed
+DIAMETER=3.0 &#8592; Change these
+SEGMENTS=500 &#8592; values as needed
 ```
 4. Add, delete, or update the values of q to use :
 ```
