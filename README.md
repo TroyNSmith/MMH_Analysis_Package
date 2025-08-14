@@ -96,7 +96,7 @@ python -m pore Run -i /home/tnsmith/simulations/octanol/nvt_prod/ -tr out/out.xt
 
 ### pore.sh
 
-Pore.sh is intended as a way to streamline batches of pore analyses through the `Run` module of `pore.py`
+`pore.sh` is intended as a way to streamline batches of pore analyses through the `Run` module of `pore.py`
 
 #### Overview
 1. Open `src/pore.sh`
@@ -131,3 +131,28 @@ residue_atom_list=(
 bash pore.sh
 ```
 7. The bash script will proceed to iterate through every combination of the entries in `workdirs`, `q_values`, and `residue_atom_list`.
+
+### short_run.sh
+
+`short_run.sh` is designed to perform short simulations with a much higher sampling frequency using the output from an equilibration procedure.
+
+#### Overview
+1. Open `src/pore.sh`
+2. Add, delete, or update the input directories :
+```
+workdirs=(
+    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/328K
+    ... <- Insert new lines here
+    )
+```
+*Note that workdirs should end at the parent directory of the simulation steps (e.g. the folder where minimization, equilibration, and production are found)*
+3. Update the input path and the output path (opt.) :
+```
+    EXTDIR="$WORKDIR"/5_nvt_prod_system_short_run <- Change to "$WORKDIR"/output_directory_path (ex. 7_nvt_prod2_system_short_run)
+    mkdir -p $EXTDIR/out
+    cp $WORKDIR/5_nvt_prod_system <- Change to "$WORKDIR"/input_directory_path (ex. 7_nvt_prod2_system) -- /{gro_nvt_prod_system.gro,prev_sim.cpt,tc_grps.ndx,top_nvt_prod_system.top} $EXTDIR 
+```
+4. Within the `src` directory, call the bash script :
+```
+bash short_run.sh
+```
