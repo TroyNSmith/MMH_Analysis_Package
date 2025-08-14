@@ -46,8 +46,8 @@ python -m pore Run --help
 #### Options:
 --- Input / Output --
 * -i / --input (str) : Path/to/the/simulation/directory
- * Path of the parent directory for topology (.tpr), trajectory (.xtc), and structure (.gro) files.
- *  ex: `-i /home/tnsmith/simulations/octanol/nvt_prod/`
+- Path of the parent directory for topology (.tpr), trajectory (.xtc), and structure (.gro) files.
+- ex: `-i /home/tnsmith/simulations/octanol/nvt_prod/`
 * -tr / --trajectory: *input*/path/to/trajectory
  * Path to the trajectory file starting from the path specified by --input.
  *  ex: `-tr out/out.xtc`
