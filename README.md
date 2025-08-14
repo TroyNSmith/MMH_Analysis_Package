@@ -146,6 +146,7 @@ workdirs=(
     )
 ```
 *Note that workdirs should end at the parent directory of the simulation steps (e.g. the folder where minimization, equilibration, and production are found)*
+
 3. Update the input path and the output path (opt.) :
 ```
     EXTDIR="$WORKDIR"/5_nvt_prod_system_short_run <- Change to "$WORKDIR"/output_directory_path (ex. 7_nvt_prod2_system_short_run)
