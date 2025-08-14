@@ -130,8 +130,5 @@ for i in "${!workdirs[@]}"; do
             -cpi $EXTDIR/out/state.cpt \
             -cpt 5 \
             -quiet no -v 
-
-        mkdir -p "$EXTDIR"/analysis/graphs/{MSD,ISF,RDF}
-        mkdir -p "$EXTDIR"/analysis/data_files/{MSD,ISF,RDF}
     fi
 done
