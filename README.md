@@ -44,26 +44,52 @@ python -m pore Run --help
 ```
 
 #### Options:
---- Input / Output --
+--- File Input / Output ---
 * -i / --input (str) : Path/to/the/simulation/directory
   * Path of the parent directory for topology (.tpr), trajectory (.xtc), and structure (.gro) files.
-  * ex: `-i /home/tnsmith/simulations/octanol/nvt_prod/`
-* -tr / --trajectory: *input*/path/to/trajectory
- * Path to the trajectory file starting from the path specified by --input.
- *  ex: `-tr out/out.xtc`
-* -tp / --topology: *input*/path/to/topology
- * Path to the topology file starting from the path specified by --input.
- *  ex: `-tr run.tpr`
-* -st / --structure: *input*/path/to/structure
- * Path to the structure file starting from the path specified by --input.
- *  ex: `-st out/out.gro`
+  *  ex: `-i /home/tnsmith/simulations/octanol/nvt_prod/`
+* -tr / --trajectory (str) : *input*/path/to/trajectory
+  * Path to the trajectory file starting from the path specified by --input.
+  *  ex: `-tr out/out.xtc`
+* -tp / --topology (str) : *input*/path/to/topology
+  * Path to the topology file starting from the path specified by --input.
+  *  ex: `-tp run.tpr`
+* -st / --structure (str) : *input*/path/to/structure
+  * Path to the structure file starting from the path specified by --input.
+  *  ex: `-st out/out.gro`
 * -o / --output (str) : Path/to/the/output/directory (opt.)
- * Path of a directory to reroute output folders/files. (default = None)
- *  ex: `-o /home/tnsmith/simulations/octanol/nvt_prod/`
-* res_name: str,
-* atoms: list[str],
-* num_segments: int,
-* pore_diameter: float,
-* q_val: float,
-* override: bool,
-* plot_only: bool
+  * Path of a directory to reroute output folders/files. (default = None)
+  *  ex: `-o /home/tnsmith/simulations/octanol/nvt_prod/`
+
+--- Topology Selections ---
+* -r / --resname (str) : RES
+  * Residue name identifier matching simulation topology.
+  *  ex : `-r OCT`
+* -a / --atoms (str) : AT1 AT2 (nargs = 2)
+  * Atom name identifiers matching simulation topology.
+  *  ex : `-a O01 C0O`
+ 
+--- Analysis Parameters ---
+* -s / --segments (int) : 0 < s &le; 1000
+  * Number of starting points to use with correlation functions. (default = 500)
+  *  ex : `-s 1000`
+* -d / --diameter (float) : 0 < d
+  * Diameter of the pore in nm.
+  *  ex : `-d 3.0`
+* -q / --q (float) : 0 < q (opt.)
+  * Magnitude of the scattering vector q. (default = None)
+  *  ex : `-q 12.56`
+ 
+ --- Flags ---
+* -ov / --override : 
+  * Whether to overwrite existing analysis output files. (default = False)
+  *  ex : `-ov`
+* -po / --plot_only :
+  * Only run plotting functions. (default = False)
+  *  ex : `-po`
+
+#### Full Example:
+*Analyze an octanol simulation, auto-detect the q-value, dump output files to `input/Analysis`, and override any existing outputs.*
+```
+python -m pore Run -i /home/tnsmith/simulations/octanol/nvt_prod/ -tr out/out.xtc -tp run.tpr -st out/out.gro -r OCT -a O01 C0O -s 1000 -d 3.0 -ov
+```
