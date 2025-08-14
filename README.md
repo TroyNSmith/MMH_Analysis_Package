@@ -104,26 +104,26 @@ Pore.sh is intended as a way to streamline batches of pore analyses through the 
 ```
 workdirs=(
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    ... &larr; Insert new lines here
+    ... <- Insert new lines here
     )
 ```
 3. Update the pore diameter and number of segments :
 ```
-DIAMETER=3.0 &#8592; Change these
-SEGMENTS=500 &#8592; values as needed
+DIAMETER=3.0 <- Change these
+SEGMENTS=500 <- values as needed
 ```
 4. Add, delete, or update the values of q to use :
 ```
 q_values=(
     12.6
-    ... &larr; Insert new lines here
+    ... <- Insert new lines here
 )
 ```
 5. Add, delete, or update the *RES AT1 AT2* pairs :
 ```
 residue_atom_list=(
     "OCT O01 H00"
-    ... &larr; Insert new lines here
+    ... <- Insert new lines here
 )
 ```
 6. Within the `src` directory, call the bash script :
