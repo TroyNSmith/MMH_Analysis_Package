@@ -8,18 +8,6 @@
 
 workdirs=(
     /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.0_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.0_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358K/7_nvt_prod2_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.2_V0.2_no_reservoir_N1/OCT/358R/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/328K/5_nvt_prod_system
-    /media/mmh/ExtraSpace/Final_Pore_Analysis_Organized_TNS/pore_D3_L6_W2_S5.0_E0.2_A0.4_V0.0_no_reservoir_N1/OCT/358K/5_nvt_prod_system
     )
 
 DIAMETER=3.0
@@ -72,12 +60,12 @@ run_python_script() {
     LOGTMP="$(mktemp)"
     if [ ${#q_values[@]} -gt 0 ]; then
         for q in "${q_values[@]}"; do
-            python -m pkg.pore run -i "$WORKDIR" -tr out/traj.xtc -tp run.tpr -st out/out.gro -r "$RESIDUE" -a "$ATOM1" "$ATOM2" -s "$SEGMENTS" -d "$DIAMETER" -q "$q" \
+            python -m pore run -i "$WORKDIR" -tr out/traj.xtc -tp run.tpr -st out/out.gro -r "$RESIDUE" -a "$ATOM1" "$ATOM2" -s "$SEGMENTS" -d "$DIAMETER" -q "$q" \
                 > >(tee "$LOGTMP") \
                 2> >(tee -a "$LOGTMP" >&2)
         done
     else
-        python -m pkg.pore run -i "$WORKDIR" -tr out/traj.xtc -tp run.tpr -st out/out.gro -r "$RESIDUE" -a "$ATOM1" "$ATOM2" -s "$SEGMENTS" -d "$DIAMETER" \
+        python -m pore run -i "$WORKDIR" -tr out/traj.xtc -tp run.tpr -st out/out.gro -r "$RESIDUE" -a "$ATOM1" "$ATOM2" -s "$SEGMENTS" -d "$DIAMETER" \
             > >(tee "$LOGTMP") \
             2> >(tee -a "$LOGTMP" >&2)
     fi

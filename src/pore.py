@@ -4,12 +4,13 @@ import mdtraj as mdt
 import numpy as np
 import os
 import pandas as pd
+import sys
 
 from openpyxl import Workbook
 from pathlib import Path
 sys.path.append(str(Path.cwd()))
 
-import functions.mdevaluate as mde
+import mdevaluate as mde
 from functions import mdevaluate_analysis, mdtraj_analysis
 from utils.coordinates import centers_of_masses, vectorize_residue
 from utils.plotting import plot_heatmap, plot_line
