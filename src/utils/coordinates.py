@@ -1,6 +1,10 @@
 import numpy as np
+import sys
 
-from .. import mdevaluate as mde
+from pathlib import Path
+sys.path.append(str(Path.cwd().parent))
+
+import mdevaluate as mde
 
 
 def centers_of_masses(
