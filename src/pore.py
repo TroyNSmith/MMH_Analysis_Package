@@ -5,15 +5,16 @@ import numpy as np
 import os
 import pandas as pd
 
-from . import mdevaluate as mde
 from openpyxl import Workbook
 from pathlib import Path
+sys.path.append(str(Path.cwd()))
 
-from .functions import mdevaluate_analysis, mdtraj_analysis
-from .utils.coordinates import centers_of_masses, vectorize_residue
-from .utils.plotting import plot_heatmap, plot_line
-from .functions import mdanalysis_analysis as hbonds
-from .utils.logging import log_analysis_yaml
+import functions.mdevaluate as mde
+from functions import mdevaluate_analysis, mdtraj_analysis
+from utils.coordinates import centers_of_masses, vectorize_residue
+from utils.plotting import plot_heatmap, plot_line
+from functions import mdanalysis_analysis as hbonds
+from utils.logging import log_analysis_yaml
 
 
 @click.group()
