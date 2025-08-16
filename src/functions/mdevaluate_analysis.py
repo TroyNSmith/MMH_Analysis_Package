@@ -1,11 +1,14 @@
 import numpy as np
 import pandas as pd
+import sys
 
 from functools import partial
+from pathlib import Path
 
-from .. import mdevaluate as mde
+sys.path.append(str(Path.cwd().parent))
 
-from ..utils.coordinates import multi_radial_selector
+import mdevaluate as mde
+from utils.coordinates import multi_radial_selector
 
 
 def mean_square_displacement(
